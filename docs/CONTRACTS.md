@@ -41,3 +41,27 @@ Paths are relative to the `02_App` root; use `flylab.paths` helpers if present, 
 
 ## flylab/tools.py  (Omnigent function tools; thin wrappers that also log to the record)
 ## agents/*.yaml   (Omnigent lab definition: supervisor + specialist sub-agents + policies)
+
+---
+# Phase 2 contracts (added Sun 00:20)
+
+## flylab/bridge.py  (brain -> body; hand-designed, documented interface)
+- `rates_to_drive(rates: dict[str, float]) -> dict` accepts EITHER per-neuron rates `{root_id_str: Hz}` (as `brain.simulate()["rates"]`)
+  OR group rates `{group_name: Hz}` (auto-detect: all-digit keys = neurons). Returns `{"forward": 0..1, "turn": -1..1 (neg = left), "backward": 0..1, "explain": {...}}`.
+  `tools._drive_from_rates` reads only forward/turn/backward; `explain` is for transparency (group rates used, reference rate, formula).
+- `brain_readouts(rates) -> dict`: non-walking behaviours read at brain level, e.g. `{"escape": {"group": "GF", "rate_hz", "active": bool}, "feed": {"group": "MN9", ...}, "groom": {...}}`.
+- `describe() -> dict`: mapping table (groups, signs, reference rates, citations) for docs/dashboard.
+
+## flylab/screen.py  (discovery engine: connectome-guided candidate ranking + fast brain screen + acceleration benchmark)
+- `candidate_types(kind: str = "visual_projection", min_n: int = 1) -> list[dict]` (`{cell_type, n, root_ids, super_class, cell_class}`), kinds include
+  "visual_projection", "descending", "ascending", "sensory", or a regex on cell_type.
+- `rank_by_connectome(target_group: str, candidates: list[str] | str, max_hops: int = 2) -> list[dict]` sorted by `score` desc
+  (`{cell_type, n, score, direct_syn, two_hop_score, sign_note}`), score documented in the docstring.
+- `brain_screen(candidates: list[str], target_groups: list[str], rate_hz=150.0, duration_ms=500.0, n_trials=2) -> list[dict]`
+  (`{cell_type, n_stimulated, target_rates: {group: Hz}, runtime_s}`).
+- `benchmark_search(target_group, candidates, known_hits: list[str], ...) -> dict` with experiments-to-first-hit for
+  connectome-guided order vs random order (expected value) vs exhaustive, and the resulting reduction factor. Saves to `data/benchmarks/<name>.json` (committed).
+
+## Dashboard (app.py, Streamlit)
+- Reads `runs/<run_id>/record.jsonl` (+ artifacts), `data/benchmarks/*.json`, `data/neurons.json`, `data/ground_truth.json`, `assets/**`.
+- Must render without any simulation dependency installed at runtime path (lazy imports), so it can be deployed in "replay" mode.
