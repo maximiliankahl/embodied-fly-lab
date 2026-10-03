@@ -6,7 +6,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "anthropic>=1.11.0",
+    "flygym>=2.1.0",
+    "matplotlib>=3.11.2",
+    "omnigent>=0.16.0",
     "python-dotenv>=1.2.4",
+    "scipy>=1.18.1",
     "streamlit>=1.64.0",
 ]
 

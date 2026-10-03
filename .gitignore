@@ -22,3 +22,9 @@ data/raw/
 Thumbs.db
 .vscode/
 .idea/
+
+# Embodied Fly Lab
+data/raw/
+data/cache/
+spikes/**/out/
+*.parquet
