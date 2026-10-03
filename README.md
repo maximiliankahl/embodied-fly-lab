@@ -44,7 +44,7 @@ Every agent decision is written to a shared research record (`runs/<run_id>/reco
 
 **1. Faster discovery: 25× fewer experiments to the first hit.**
 Target: backward-walking command neurons (MDN). We screened all 326 visual projection types in the whole-brain model (1.24 s per experiment) and counted 12 in-silico hits.
-- Ranked by connectome path strength, the **first hit comes after 1 experiment, vs. 25.2 expected for random order (25×)**.
+- Ranked by connectome path strength, the **first hit comes after 1 experiment, vs. 25.2 expected for random order (25×)**. Against a stronger naive baseline ("largest cell type first") the gain is 5× to the first hit and 7× to all hits.
 - A 20-experiment budget (6 % of the screen) finds 12 of 12 hits, vs. 0.7 expected for random order.
 - **Independent check against literature:** the first *literature-verified* hit (LC16; Wu et al. 2016, Sen et al. 2017) comes after **12 guided experiments vs. 109 random (9×)**.
 - Caveats: the all-hits speed-up (15×) holds only for one score variant (3-hop mean-field), so we lead with the first-hit number. For the escape target (giant fiber) the first hit is also 18× faster, but finding *all* hits is not faster (0.97×).
