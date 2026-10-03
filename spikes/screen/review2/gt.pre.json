@@ -1,0 +1,591 @@
+{
+ "_meta": {
+  "description": "Literature-verified neuron -> behaviour relations. Each DOI was resolved via Europe PMC/OpenAlex (flylab.literature.get_by_doi); 'evidence' is a verbatim abstract fragment (<=25 words), 'evidence_fulltext' (optional) a verbatim full-text sentence fragment.",
+  "behaviors": [
+   "forward",
+   "backward",
+   "turn_left",
+   "turn_right",
+   "stop",
+   "escape",
+   "groom",
+   "feed"
+  ],
+  "effect": "'induce' = manipulation evokes/increases the behaviour; 'reduce' = manipulation abolishes/decreases it. For 'reduce' entries, observing expected_behavior is INCONSISTENT with the paper - use atlas.evaluate().",
+  "built": "2026-10-04 00:40"
+ },
+ "entries": [
+  {
+   "id": "gt01_mdn_activate_backward",
+   "manipulation": "activate",
+   "target_group": "MDN",
+   "expected_behavior": "backward",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases backward walking",
+   "evidence": "sufficient to trigger backward walking under conditions in which flies would otherwise walk forward",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.1126/science.1249964",
+    "title": "Neuronal control of Drosophila walking direction",
+    "year": 2014,
+    "authors": "Bidaye SS, Machacek C, Wu Y, Dickson BJ.",
+    "url": "https://doi.org/10.1126/science.1249964",
+    "pmid": "24700860",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "high"
+  },
+  {
+   "id": "gt02_mdn_silence_backward",
+   "manipulation": "silence",
+   "target_group": "MDN",
+   "expected_behavior": "backward",
+   "effect": "reduce",
+   "expected_outcome": "silencing the target group REDUCES/abolishes backward walking (compare against a control without the manipulation)",
+   "evidence": "MDN activity is required for flies to walk backward when they encounter an impassable barrier",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.1126/science.1249964",
+    "title": "Neuronal control of Drosophila walking direction",
+    "year": 2014,
+    "authors": "Bidaye SS, Machacek C, Wu Y, Dickson BJ.",
+    "url": "https://doi.org/10.1126/science.1249964",
+    "pmid": "24700860",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "high",
+   "context": "fly encounters an impassable barrier (would normally back up)"
+  },
+  {
+   "id": "gt03_p9_activate_forward",
+   "manipulation": "activate",
+   "target_group": "P9",
+   "expected_behavior": "forward",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases forward walking",
+   "evidence": "P9 drives forward walking with ipsilateral turning",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.1016/j.neuron.2020.07.032",
+    "title": "Two Brain Pathways Initiate Distinct Forward Walking Programs in Drosophila",
+    "year": 2020,
+    "authors": "Bidaye SS, Laturney M, Chang AK, Liu Y, Bockemühl T, Büschges A, Scott K.",
+    "url": "https://doi.org/10.1016/j.neuron.2020.07.032",
+    "pmid": "32822613",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "high"
+  },
+  {
+   "id": "gt04_p9L_activate_turn_left",
+   "manipulation": "activate",
+   "target_group": "P9_L",
+   "expected_behavior": "turn_left",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases left turning",
+   "evidence": "P9 drives forward walking with ipsilateral turning",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.1016/j.neuron.2020.07.032",
+    "title": "Two Brain Pathways Initiate Distinct Forward Walking Programs in Drosophila",
+    "year": 2020,
+    "authors": "Bidaye SS, Laturney M, Chang AK, Liu Y, Bockemühl T, Büschges A, Scott K.",
+    "url": "https://doi.org/10.1016/j.neuron.2020.07.032",
+    "pmid": "32822613",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "medium",
+   "context": "unilateral activation; forward walking with ipsilateral turning",
+   "note": "Abstract says 'ipsilateral turning'; that unilateral (left-only) activation yields a left turn is our inference."
+  },
+  {
+   "id": "gt05_dna02L_activate_turn_left",
+   "manipulation": "activate",
+   "target_group": "DNa02_L",
+   "expected_behavior": "turn_left",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases left turning",
+   "evidence": "descending neurons in the Drosophila brain that predict and influence orientation (heading) during walking",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.7554/elife.102230",
+    "title": "Neural circuit mechanisms for steering control in walking Drosophila",
+    "year": 2025,
+    "authors": "Rayshubskiy A, Holtz SL, Bates AS, Vanderbeck QX, Serratosa Capdevila L, Rockwell V, Wilson R.",
+    "url": "https://doi.org/10.7554/elife.102230",
+    "pmid": "40690376",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "medium",
+   "evidence_fulltext": "unilateral activation of DNa02 influences ipsilateral rotational movements",
+   "note": "Ipsilateral direction from the full text (Europe PMC PMC12279373); reviewers note activation does not always reliably evoke turning."
+  },
+  {
+   "id": "gt06_dna02R_activate_turn_right",
+   "manipulation": "activate",
+   "target_group": "DNa02_R",
+   "expected_behavior": "turn_right",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases right turning",
+   "evidence": "descending neurons in the Drosophila brain that predict and influence orientation (heading) during walking",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.7554/elife.102230",
+    "title": "Neural circuit mechanisms for steering control in walking Drosophila",
+    "year": 2025,
+    "authors": "Rayshubskiy A, Holtz SL, Bates AS, Vanderbeck QX, Serratosa Capdevila L, Rockwell V, Wilson R.",
+    "url": "https://doi.org/10.7554/elife.102230",
+    "pmid": "40690376",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "medium",
+   "evidence_fulltext": "unilateral activation of DNa02 influences ipsilateral rotational movements",
+   "note": "Mirror of gt05."
+  },
+  {
+   "id": "gt07_gf_activate_escape",
+   "manipulation": "activate",
+   "target_group": "GF",
+   "expected_behavior": "escape",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases escape (takeoff/jump)",
+   "evidence": "Photostimulation of neurons in the giant fiber system elicited the characteristic escape behaviors of jumping, wing beating, and flight",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.1016/j.cell.2005.02.004",
+    "title": "Remote control of behavior through genetically targeted photostimulation of neurons",
+    "year": 2005,
+    "authors": "Lima SQ, Miesenböck G.",
+    "url": "https://doi.org/10.1016/j.cell.2005.02.004",
+    "pmid": "15820685",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "high",
+   "note": "Lima & Miesenboeck targeted the giant fiber system (GF plus partners), not GF alone."
+  },
+  {
+   "id": "gt08_lplc2_activate_escape",
+   "manipulation": "activate",
+   "target_group": "LPLC2",
+   "expected_behavior": "escape",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases escape (takeoff/jump)",
+   "evidence": "for several types, optogenetic activation in freely moving flies evokes specific behaviors",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.7554/eLife.21022",
+    "title": "Visual projection neurons in the Drosophila lobula link feature detection to distinct behavioral programs",
+    "year": 2016,
+    "authors": "Wu M, Nern A, Williamson WR, Morimoto MM, Reiser MB, Card GM, Rubin GM.",
+    "url": "https://doi.org/10.7554/eLife.21022",
+    "pmid": "28029094",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "high",
+   "evidence_fulltext": "LPLC2 activation elicited both jumping and backward walking behaviors with about equal penetrance in the arena assay.",
+   "readout_group": "GF",
+   "note": "LPLC2-specific statement is in the full text (jumping = escape takeoff). The abstract's 'two LC types' resembling loom avoidance are LC6/LC16, not LPLC2 (full text: not known 'whether LPLC1, LPLC2, LC4 and LC15 are indeed sensitive to looming'). Brain-model readout suggestion: giant fiber (DNp01) firing; LPLC2 synapses directly onto GF (Ache et al. 2019)."
+  },
+  {
+   "id": "gt19_lplc2_activate_backward",
+   "manipulation": "activate",
+   "target_group": "LPLC2",
+   "expected_behavior": "backward",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases backward walking",
+   "evidence": "for several types, optogenetic activation in freely moving flies evokes specific behaviors",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.7554/eLife.21022",
+    "title": "Visual projection neurons in the Drosophila lobula link feature detection to distinct behavioral programs",
+    "year": 2016,
+    "authors": "Wu M, Nern A, Williamson WR, Morimoto MM, Reiser MB, Card GM, Rubin GM.",
+    "url": "https://doi.org/10.7554/eLife.21022",
+    "pmid": "28029094",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "medium",
+   "evidence_fulltext": "LPLC2 activation elicited both jumping and backward walking behaviors with about equal penetrance in the arena assay.",
+   "readout_group": "MDN",
+   "note": "Body-level counterpart of gt08 (the physics body cannot jump). Backward walking and jumping occurred with about equal penetrance, so either outcome is consistent with the paper; the MDN readout is our suggestion, not a claim of the paper."
+  },
+  {
+   "id": "gt09_lplc2_silence_escape",
+   "manipulation": "silence",
+   "target_group": "LPLC2",
+   "expected_behavior": "escape",
+   "effect": "reduce",
+   "expected_outcome": "silencing the target group REDUCES/abolishes escape (takeoff/jump) (compare against a control without the manipulation)",
+   "evidence": "We find LPLC2 neurons to be necessary for GF-mediated escape",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.1016/j.cub.2019.01.079",
+    "title": "Neural Basis for Looming Size and Velocity Encoding in the Drosophila Giant Fiber Escape Pathway",
+    "year": 2019,
+    "authors": "Ache JM, Polsky J, Alghailani S, Parekh R, Breads P, Peek MY, Bock DD, von Reyn CR, Card GM.",
+    "url": "https://doi.org/10.1016/j.cub.2019.01.079",
+    "pmid": "30827912",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "high",
+   "context": "looming stimulus / GF-mediated escape"
+  },
+  {
+   "id": "gt10_sugar_activate_feed",
+   "manipulation": "activate",
+   "target_group": "sugar_GRN_shiu2024",
+   "expected_behavior": "feed",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases feeding initiation (proboscis extension)",
+   "evidence": "The motor neurons are activated by sugar stimulation of gustatory neurons and inhibited by bitter compounds",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.1016/j.neuron.2008.12.033",
+    "title": "Motor control in a Drosophila taste circuit",
+    "year": 2009,
+    "authors": "Gordon MD, Scott K.",
+    "url": "https://doi.org/10.1016/j.neuron.2008.12.033",
+    "pmid": "19217375",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "high",
+   "readout_group": "MN9",
+   "note": "Model readout: MN9 firing (Shiu et al. 2024 use MN9 as proxy for proboscis extension). Laterality: Shiu et al. 2024 (doi:10.1038/s41586-024-07763-9, full text) report that 'unilateral sugar GRN activation activates the contralateral MN9 more strongly compared with the ipsilateral MN9'. With v783 sides, sugar_GRN_shiu2024 is L, so expect MN9_R > MN9_L (reviewer smoke test, 150 Hz: MN9_R 98 Hz vs MN9_L 62 Hz)."
+  },
+  {
+   "id": "gt11_bitter_activate_reduce_feed",
+   "manipulation": "activate",
+   "target_group": "bitter_GRN_shiu2024",
+   "expected_behavior": "feed",
+   "effect": "reduce",
+   "expected_outcome": "activating the target group REDUCES/abolishes feeding initiation (proboscis extension) (compare against a control without the manipulation)",
+   "evidence": "the feeding initiation circuit is inhibited by a bitter taste pathway that impinges on premotor neurons",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.7554/elife.79887",
+    "title": "Taste quality and hunger interactions in a feeding sensorimotor circuit",
+    "year": 2022,
+    "authors": "Shiu PK, Sterne GR, Engert S, Dickson BJ, Scott K.",
+    "url": "https://doi.org/10.7554/elife.79887",
+    "pmid": "35791902",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "high",
+   "context": "co-activation with sugar GRNs; bitter suppresses sugar-evoked feeding initiation",
+   "readout_group": "MN9"
+  },
+  {
+   "id": "gt12_mn9_activate_feed",
+   "manipulation": "activate",
+   "target_group": "MN9",
+   "expected_behavior": "feed",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases feeding initiation (proboscis extension)",
+   "evidence": "By silencing and activating subsets of the defined cell population, we identify the neurons involved in the taste behavior as a pair of motor neurons",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.1016/j.neuron.2008.12.033",
+    "title": "Motor control in a Drosophila taste circuit",
+    "year": 2009,
+    "authors": "Gordon MD, Scott K.",
+    "url": "https://doi.org/10.1016/j.neuron.2008.12.033",
+    "pmid": "19217375",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "medium",
+   "note": "Identity of these motor neurons with FlyWire MN9 (CB0701) relies on Shiu et al. 2024, which cites MN9 as controlling rostrum lifting."
+  },
+  {
+   "id": "gt13_water_activate_feed",
+   "manipulation": "activate",
+   "target_group": "water_GRN_shiu2024",
+   "expected_behavior": "feed",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases feeding initiation (proboscis extension)",
+   "evidence": "activation of sugar-sensing or water-sensing gustatory neurons in the computational model accurately predicts neurons that respond to tastes and are required for feeding initiation",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.1038/s41586-024-07763-9",
+    "title": "A Drosophila computational brain model reveals sensorimotor processing",
+    "year": 2024,
+    "authors": "Shiu PK, Sterne GR, Spiller N, Franconville R, Sandoval A, Zhou J, Simha N, Kang CH, Yu S, Kim JS, Dorkenwald S, Matsliah A, Schlegel P, Yu SC, McKellar CE, Sterling A, Costa M, Eichler K, Bates AS, Eckstein N, Funke J, Jefferis GSXE, Murthy M, Bidaye SS, Hampel S, Seeds AM, Scott K.",
+    "url": "https://doi.org/10.1038/s41586-024-07763-9",
+    "pmid": "39358519",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "medium",
+   "context": "thirsty fly",
+   "readout_group": "MN9",
+   "note": "Supporting statement is about the model's agreement with experiments, not a direct behavioural experiment."
+  },
+  {
+   "id": "gt14_jo_activate_groom",
+   "manipulation": "activate",
+   "target_group": "JO_CE_shiu2024",
+   "expected_behavior": "groom",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases grooming",
+   "evidence": "This multilayered circuit is organized such that neurons within each layer are sufficient to specifically elicit antennal grooming",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.7554/eLife.08758",
+    "title": "A neural command circuit for grooming movement control",
+    "year": 2015,
+    "authors": "Hampel S, Franconville R, Simpson JH, Seeds AM.",
+    "url": "https://doi.org/10.7554/eLife.08758",
+    "pmid": "26344548",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "medium",
+   "readout_group": "aDN1_shiu2024",
+   "note": "The first circuit layer are the antennal mechanosensory chordotonal (Johnston's organ) neurons ('Mechanosensory chordotonal neurons detect displacements of the antennae and excite three different classes of functionally connected interneurons'). That the JO-C/E subset used by Shiu et al. is the sufficient population is our mapping (medium)."
+  },
+  {
+   "id": "gt15_abn1_activate_groom",
+   "manipulation": "activate",
+   "target_group": "aBN1",
+   "expected_behavior": "groom",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases grooming",
+   "evidence": "neurons within each layer are sufficient to specifically elicit antennal grooming",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.7554/eLife.08758",
+    "title": "A neural command circuit for grooming movement control",
+    "year": 2015,
+    "authors": "Hampel S, Franconville R, Simpson JH, Seeds AM.",
+    "url": "https://doi.org/10.7554/eLife.08758",
+    "pmid": "26344548",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "medium",
+   "readout_group": "aDN1_shiu2024",
+   "note": "aBN1 = SAD093 mapping via Shiu et al. figures.ipynb `id_aBN1`."
+  },
+  {
+   "id": "gt16_dng07_activate_groom",
+   "manipulation": "activate",
+   "target_group": "DNg07",
+   "expected_behavior": "groom",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases grooming",
+   "evidence": "activation of most of the descending neurons drove stereotyped behaviors",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.7554/eLife.34275",
+    "title": "Optogenetic dissection of descending behavioral control in Drosophila",
+    "year": 2018,
+    "authors": "Cande J, Namiki S, Qiu J, Korff W, Card GM, Shaevitz JW, Stern DL, Berman GJ.",
+    "url": "https://doi.org/10.7554/eLife.34275",
+    "pmid": "29943729",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "medium",
+   "evidence_fulltext": "we found descending neurons that produced different types of grooming, such as head grooming (DNg07 and DNg08, and DNg12)",
+   "note": "Cande et al. 2018 DN screen (head grooming); split-GAL4 line vs. all 8 FlyWire DNg07 per side."
+  },
+  {
+   "id": "gt17_p9_activate_forward_braun",
+   "manipulation": "activate",
+   "target_group": "P9",
+   "expected_behavior": "forward",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases forward walking",
+   "evidence": "command-like neurons that are sufficient to drive behaviours",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.1038/s41586-024-07523-9",
+    "title": "Descending networks transform command signals into population motor control",
+    "year": 2024,
+    "authors": "Braun J, Hurtak F, Wang-Chen S, Ramdya P.",
+    "url": "https://doi.org/10.1038/s41586-024-07523-9",
+    "pmid": "38839968",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "high",
+   "evidence_fulltext": "Flies reliably (i) walk forward upon DNp09 stimulation for stimuli ≥ 21 μ W",
+   "note": "Independent replication (Braun et al. 2024, Ramdya lab) of DNp09->forward and MDN->backward."
+  },
+  {
+   "id": "gt18_mdn_activate_backward_braun",
+   "manipulation": "activate",
+   "target_group": "MDN",
+   "expected_behavior": "backward",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases backward walking",
+   "evidence": "command-like neurons that are sufficient to drive behaviours",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.1038/s41586-024-07523-9",
+    "title": "Descending networks transform command signals into population motor control",
+    "year": 2024,
+    "authors": "Braun J, Hurtak F, Wang-Chen S, Ramdya P.",
+    "url": "https://doi.org/10.1038/s41586-024-07523-9",
+    "pmid": "38839968",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "high",
+   "evidence_fulltext": "(iii) walk backward upon MDN stimulation for stimuli ≥ 10.5 μ W"
+  },
+  {
+   "id": "gt20_lc16_activate_backward",
+   "manipulation": "activate",
+   "target_group": "LC16",
+   "expected_behavior": "backward",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases backward walking",
+   "evidence": "The activation phenotypes of two LC types closely resemble natural avoidance behaviors triggered by a visual loom",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.7554/eLife.21022",
+    "title": "Visual projection neurons in the Drosophila lobula link feature detection to distinct behavioral programs",
+    "year": 2016,
+    "authors": "Wu M, Nern A, Williamson WR, Morimoto MM, Reiser MB, Card GM, Rubin GM.",
+    "url": "https://doi.org/10.7554/eLife.21022",
+    "pmid": "28029094",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "high",
+   "evidence_fulltext": "this variability does not change our conclusion that LC16 activation results in a strong backward walking response",
+   "readout_group": "MDN",
+   "note": "Full text (Europe PMC PMC5293491): bilateral activation; 'Unilateral LC16 activation produced far less backward walking than bilateral activation' and instead turning. The MDN readout is supported by Sen et al. 2017 (gt21)."
+  },
+  {
+   "id": "gt21_lc16_activate_backward_via_mdn",
+   "manipulation": "activate",
+   "target_group": "LC16",
+   "expected_behavior": "backward",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases backward walking",
+   "evidence": "LC16 and MDNs are critical components of the neural circuit that transduces threatening visual stimuli into directional locomotor output",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.1016/j.cub.2017.02.008",
+    "title": "Moonwalker Descending Neurons Mediate Visually Evoked Retreat in Drosophila",
+    "year": 2017,
+    "authors": "Sen R, Wu M, Branson K, Robie A, Rubin GM, Dickson BJ.",
+    "url": "https://doi.org/10.1016/j.cub.2017.02.008",
+    "pmid": "28238656",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "high",
+   "readout_group": "MDN",
+   "note": "Abstract: 'we hypothesized that LC16 neurons induce backward walking via MDNs' and reports 'functional imaging, behavioral epistasis, and unilateral activation experiments that support these hypotheses'. Mechanistic prediction for the brain model: LC16 activation should drive MDN firing."
+  },
+  {
+   "id": "gt22_lc4_activate_escape",
+   "manipulation": "activate",
+   "target_group": "LC4",
+   "expected_behavior": "escape",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases escape (takeoff/jump)",
+   "evidence": "for several types, optogenetic activation in freely moving flies evokes specific behaviors",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.7554/eLife.21022",
+    "title": "Visual projection neurons in the Drosophila lobula link feature detection to distinct behavioral programs",
+    "year": 2016,
+    "authors": "Wu M, Nern A, Williamson WR, Morimoto MM, Reiser MB, Card GM, Rubin GM.",
+    "url": "https://doi.org/10.7554/eLife.21022",
+    "pmid": "28029094",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "medium",
+   "evidence_fulltext": "five different cell types (LC4, LC6, LC15, LPLC1 and LPLC2) drove highly penetrant jumping in at least one of the two assays",
+   "readout_group": "GF",
+   "note": "Jumping = escape takeoff; Wu et al. did not test whether the jumps are GF-mediated (full text: 'LC4 neurons ... might evoke a jumping response via activation of the Giant Fiber (GF) cells'). Supporting GF link: Ache et al. 2019 (doi:10.1016/j.cub.2019.01.079) abstract: 'show that LPLC2 and LC4 synapse directly onto the GF' (anatomy, EM); von Reyn et al. 2017 (Neuron, doi:10.1016/j.neuron.2017.05.036) abstract: 'we identify a visual projection neuron type that conveys predator approach information to the Drosophila giant fiber (GF) escape circuit'. GF readout is our suggestion."
+  },
+  {
+   "id": "gt23_lc6_activate_escape",
+   "manipulation": "activate",
+   "target_group": "LC6",
+   "expected_behavior": "escape",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases escape (takeoff/jump)",
+   "evidence": "The activation phenotypes of two LC types closely resemble natural avoidance behaviors triggered by a visual loom",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.7554/eLife.21022",
+    "title": "Visual projection neurons in the Drosophila lobula link feature detection to distinct behavioral programs",
+    "year": 2016,
+    "authors": "Wu M, Nern A, Williamson WR, Morimoto MM, Reiser MB, Card GM, Rubin GM.",
+    "url": "https://doi.org/10.7554/eLife.21022",
+    "pmid": "28029094",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "high",
+   "evidence_fulltext": "three LC neuron driver lines that produced robust and highly penetrant activation phenotypes in both assays: LC6 (jumping)",
+   "readout_group": "GF",
+   "note": "The two loom-like LC types of the abstract are LC6 (jumping) and LC16 (backward walking) per the full text. GF readout is our suggestion; Wu et al. did not test GF dependence."
+  }
+ ]
+}

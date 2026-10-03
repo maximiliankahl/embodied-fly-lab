@@ -1,0 +1,2 @@
+C:\Users\mkahl\Hackathon\HackNation-7\02_App\flylab\screen.py:553: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  rho = spearmanr([score[n] for n in names], [rate[n] for n in names]).correlation

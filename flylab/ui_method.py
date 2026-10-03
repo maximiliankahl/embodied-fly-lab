@@ -79,8 +79,10 @@ LIMITS = [
     "Hypotheses are agent-generated and are labelled as such.",
     "Speed-up numbers are measured on one laptop for this pipeline and a small candidate set; they are not a "
     "general claim about lab experiments. The in-silico hits are defined by the same connectome model that ranks "
-    "the candidates (partly circular), the primary ranking score was chosen after a pilot, and the literature "
-    "check rests on only 2 known inputs per target (see Validation & speed, Acceleration).",
+    "the candidates (partly circular), the primary ranking score was chosen after a pilot, random order is a weak "
+    "baseline (a no-connectome 'largest types first' order shrinks the gain considerably), several near-threshold "
+    "hits do not replicate with a second seed, and the literature check rests on only 2 known inputs per target "
+    "(see Validation & speed, Acceleration).",
     "The end-to-end agreement counts include direct descending-neuron activations whose outcome the bridge was "
     "designed to produce (same papers), so they test plumbing and sign conventions, not discovery.",
 ]

@@ -126,9 +126,11 @@ DRIVE_KEYS = ("forward", "turn", "backward")
 # Controller every 5 physics steps by default (Phase 2 decision, evidence in
 # spikes/bridge/body_check.py -> spikes/bridge/out/body_check.json): over 8 drives x 4
 # seed/noise settings (1 s each) control_every=5 vs 1 gave 32/32 identical behaviour
-# labels; forward / turn / stop metrics within 0.1 mm and 1.3 deg; backward runs differ
-# by up to 3.3 mm / 20 deg, which is inside the seed-to-seed spread of control_every=1
-# itself (backward heading change -5..+33 deg across seeds); median wall time per
+# labels; forward / turn_left / turn_right / stop demo drives within 0.11 mm and 1.3 deg;
+# the mixed P9_L-like drive (forward 0.5, turn -0.62, ~186 deg in 1 s) within 0.8 mm /
+# 9.7 deg; backward runs differ by up to 3.3 mm / 20 deg, which is inside the seed-to-seed
+# spread of control_every=1 itself (backward heading change -5..+33 deg across seeds)
+# (max differences re-checked by the reviewer from body_check.json); median wall time per
 # simulated second 9.0 s -> 2.6 s (3.5x). Pass control_every=1 for the tutorial setting.
 DEFAULT_CONTROL_EVERY = 5
 MIN_DURATION_S = 0.05  # shorter runs are clamped up (avoids empty trajectories / div by 0)

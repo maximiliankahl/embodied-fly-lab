@@ -327,8 +327,13 @@ def key_results() -> list[tuple[str, str]]:
         s = d.get("search") if isinstance(d, dict) else None
         tg = d.get("target_group", p.stem) if isinstance(d, dict) else p.stem
         if isinstance(s, dict) and s.get("reduction_factor_first_hit") is not None:
+            bl = ((d.get("baselines") or {}).get("largest_type_first") or {}) if isinstance(d, dict) else {}
+            bl_txt = (f"; vs. the stronger 'largest type first' baseline only "
+                      f"{_fx(bl.get('guided_speedup_vs_baseline_first'))} / {_fx(bl.get('guided_speedup_vs_baseline_all'))}"
+                      if isinstance(bl, dict) and bl.get("guided_speedup_vs_baseline_first") is not None else "")
             out.append((f"{tg}: fewer simulations to the first / to all {s.get('n_hits', '?')} in-silico hits "
-                        "(connectome-guided vs. random order; hits defined by the same connectome model)",
+                        "(connectome-guided vs. random order; hits defined by the same connectome model"
+                        f"{bl_txt})",
                         f"{_fx(s['reduction_factor_first_hit'])} / {_fx(s.get('reduction_factor_all_hits'))}"))
         lit = (d.get("literature") or {}).get("search_for_literature_hits") if isinstance(d, dict) else None
         if isinstance(lit, dict) and lit.get("reduction_factor_first_hit") is not None:

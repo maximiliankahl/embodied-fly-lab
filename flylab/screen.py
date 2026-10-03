@@ -148,6 +148,7 @@ def _matrices():
     import scipy.sparse as sp
     from flylab import brain
     c = brain.load_connectome()   # shared with the simulator, not counted as ranking cost
+    _check_connectome_intact()    # fingerprint before building
     t0 = time.perf_counter()
     # COPY indices/indptr: scipy shares the arrays passed in and sorts the column indices in place during later
     # operations (sum_duplicates/sort_indices), which silently scrambled the simulator's connectome (indices permuted,
@@ -159,7 +160,28 @@ def _matrices():
     A = W @ sp.diags(inv)
     out = (W.T.tocsr(), A.T.tocsr())
     _MATRIX_BUILD_S.append(time.perf_counter() - t0)
+    _check_connectome_intact()
     return out
+
+
+_CONN_FP: list[str] = []
+
+
+def _check_connectome_intact() -> None:
+    """Guard against the in-place scrambling bug above: fingerprint brain.load_connectome() arrays on first use and
+    raise if they change later in the same process (a scrambled connectome gives silently wrong simulations)."""
+    import hashlib
+    from flylab import brain
+    c = brain.load_connectome()
+    h = hashlib.sha1()
+    for a in (c.indices, c.indptr, c.syn):
+        h.update(np.ascontiguousarray(a[:: 211]).tobytes())
+    fp = h.hexdigest()
+    if not _CONN_FP:
+        _CONN_FP.append(fp)
+    elif _CONN_FP[0] != fp:
+        raise RuntimeError("brain connectome arrays were modified in place in this process; simulations would be wrong. "
+                           "Restart the Python process.")
 
 
 def _lif_rate(V: np.ndarray) -> np.ndarray:
@@ -314,6 +336,7 @@ def brain_screen(candidates: list | str, target_groups: list[str], rate_hz: floa
     cache = _load_cache() if use_cache else {}
     out = []
     names = _names(candidates)
+    _check_connectome_intact()
     t_all = time.perf_counter()
     for i, ct in enumerate(names):
         key = _cache_key(ct, rate_hz, duration_ms, n_trials, seed, n_threads)
@@ -638,14 +661,26 @@ def benchmark_search(target_group: str, candidates: list | str = "visual_project
     lit_headline = None
     if lit_stats and lit_stats["n_hits"]:
         one_hop = sens_hops.get(f"{method}_1hop", {}).get("vs_literature_hits") or {}
-        lit_headline = (f"Literature check: first literature-verified hit ({', '.join(known_in)}) after "
-                        f"{lit_stats['guided']['experiments_to_first_hit']:.1f} guided experiments vs "
+        first_lit = min(known_in, key=lambda k: rank[k])
+        lit_headline = (f"Literature check: the guided order reaches the first literature-known driver of {target_group} "
+                        f"({first_lit}, connectome rank {rank[first_lit]}"
+                        + ("" if first_lit in hits else "; NOT an in-silico hit") + f"; set: {', '.join(known_in)}) after "
+                        f"{lit_stats['guided']['experiments_to_first_hit']:.1f} experiments vs "
                         f"{lit_stats['random']['experiments_to_first_hit_expected']:.1f} expected random "
                         f"({lit_stats.get('reduction_factor_first_hit')}x"
                         + (f"; direct-synapse-only ranking: {one_hop['guided_first']:.1f}" if one_hop.get("guided_first") else "")
                         + f"); in-silico recall of literature hits {sum(k in hits for k in known_in)}/{len(known_in)}"
                         + (f" (missed: {', '.join(k for k in known_in if k not in hits)})" if any(k not in hits for k in known_in) else "")
                         + ".")
+        confirmed = [k for k in known_in if k in hits]
+        if confirmed and set(confirmed) != set(known_in):
+            first_c = min(confirmed, key=lambda k: rank[k])
+            e_c = _expected_random_first(len(names), len(confirmed))
+            lit_stats["first_literature_hit_confirmed_in_silico"] = {
+                "cell_type": first_c, "guided_experiments": rank[first_c], "random_expected": e_c,
+                "reduction_factor": round(e_c / rank[first_c], 2)}
+            lit_headline += (f" First literature-known driver that the model also confirms: {first_c} after {rank[first_c]} "
+                             f"guided experiments vs {e_c:.1f} expected random ({e_c / rank[first_c]:.1f}x).")
     result = {
         "name": name or f"screen_{target_group.lower()}",
         "target_group": target_group,
@@ -719,8 +754,20 @@ def benchmark_search(target_group: str, candidates: list | str = "visual_project
     }
     if save:
         BENCH.mkdir(parents=True, exist_ok=True)
-        (BENCH / f"{result['name']}.json").write_text(json.dumps(result, indent=1, default=_json_default), encoding="utf-8")
+        (BENCH / f"{result['name']}.json").write_text(json.dumps(_no_nan(result), indent=1, default=_json_default,
+                                                                 allow_nan=False), encoding="utf-8")
     return result
+
+
+def _no_nan(o: Any):
+    """NaN/inf -> None so the saved file is strict JSON (NaN breaks JavaScript/strict parsers)."""
+    if isinstance(o, dict):
+        return {k: _no_nan(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_no_nan(v) for v in o]
+    if isinstance(o, (float, np.floating)) and not math.isfinite(float(o)):
+        return None
+    return o
 
 
 def _json_default(o: Any):

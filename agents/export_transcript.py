@@ -71,12 +71,15 @@ def main(argv: list[str] | None = None) -> int:
                     f.write(json.dumps({"record_type": "item", **it}, default=str) + "\n")
             children = (_get(c, f"{base}/v1/sessions/{sid}/child_sessions", limit=200).get("data") or [])
             tree.append({"id": sid, "parent": parent, "agent": meta.get("agent_name") or meta.get("title"),
-                         "title": meta.get("title"), "n_items": len(items), "usage": meta.get("usage"),
+                         "title": meta.get("title"), "n_items": len(items), "model": meta.get("llm_model"),
+                         "total_cost_usd": meta.get("total_cost_usd"), "usage_by_model": meta.get("usage_by_model"),
                          "n_children": len(children)})
             todo.extend((ch.get("id"), sid) for ch in children if ch.get("id"))
-    (out_dir / "sessions.json").write_text(json.dumps({"root": a.conv_id, "run_id": run_id, "sessions": tree},
+    root_cost = tree[0].get("total_cost_usd") if tree else None  # root session cost includes its sub-agents
+    (out_dir / "sessions.json").write_text(json.dumps({"root": a.conv_id, "run_id": run_id,
+                                                      "root_total_cost_usd": root_cost, "sessions": tree},
                                                       indent=1, default=str), encoding="utf-8")
-    print(f"exported {len(tree)} sessions -> {out_dir.relative_to(ROOT)}")
+    print(f"exported {len(tree)} sessions -> {out_dir.relative_to(ROOT)} (root total_cost_usd={root_cost})")
     return 0
 
 

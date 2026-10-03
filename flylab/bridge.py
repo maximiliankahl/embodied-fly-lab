@@ -344,7 +344,8 @@ CONDITION_NOTES = {
                "and the body receives a zero drive.",
     "DNa02_L": "Steering DN alone, no locomotor DN active -> turning in place. Rayshubskiy et al. tested walking flies.",
     "DNa02_R": "Steering DN alone, no locomotor DN active -> turning in place. Rayshubskiy et al. tested walking flies.",
-    "LPLC2_bilateral": "Natural upstream (visual looming) stimulus. In the brain model LPLC2 drives the giant fiber "
+    "LPLC2_bilateral": "Upstream visual stimulus: direct 150 Hz activation of the looming-sensitive LPLC2 neurons "
+                       "(analogous to the optogenetic activation of Wu et al. 2016, not a simulated looming stimulus). In the brain model LPLC2 drives the giant fiber "
                        "strongly but MDN stays at 0 Hz, so the body does not walk backward. Wu et al. 2016 report "
                        "jumping and backward walking with about equal penetrance: the escape half is reproduced, "
                        "the backward half is not. Unverified hypothesis: the backward component uses DNs other than "
@@ -415,10 +416,16 @@ def validate(duration_s: float = 1.0, brain_ms: float = 1000.0, n_trials: int = 
         video = None
         if r["video_tmp"] and Path(r["video_tmp"]).exists():
             src = Path(r["video_tmp"])
-            ASSET_DIR.mkdir(parents=True, exist_ok=True)
-            dst = ASSET_DIR / f"{name}{src.suffix}"
-            shutil.copyfile(src, dst)
-            video = dst.relative_to(ROOT).as_posix()
+            if save and not only:  # only a full, saved run replaces the committed videos
+                ASSET_DIR.mkdir(parents=True, exist_ok=True)
+                dst = ASSET_DIR / f"{name}{src.suffix}"
+                shutil.copyfile(src, dst)
+            else:
+                dst = src
+            try:
+                video = dst.resolve().relative_to(ROOT).as_posix()
+            except ValueError:
+                video = dst.as_posix()
         row = {"condition": name, "stimulus_groups": excite, "silenced_groups": silence,
                "key_group_rates_hz": {g: r["group_rates_hz"].get(g, 0.0) for g in KEY_GROUPS},
                "n_active_neurons": r["rates_n_active"], "drive": r["drive"], "behavior": beh,
@@ -517,6 +524,10 @@ def validate(duration_s: float = 1.0, brain_ms: float = 1000.0, n_trials: int = 
                     "verdicts": {c["gt_id"]: c["verdict"] for c in all_checks},
                     "total_wall_s": round(time.perf_counter() - t_all, 1)},
     }
+    sm = out["summary"]
+    print(f"final verdicts (after silencing-control check): {sm['verdicts']}")
+    print(f"hit rate {sm['n_consistent']}/{sm['n_comparable']} comparable = {sm['hit_rate']} "
+          f"(inconclusive: {sm['n_inconclusive']}; not_comparable excluded)")
     if save:
         # a subset run (--only) must not overwrite the full committed benchmark the dashboard reads
         target = BENCH_JSON if not only else OUT_DIR / "embodied_validation_subset.json"

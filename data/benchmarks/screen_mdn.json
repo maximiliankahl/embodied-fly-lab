@@ -8,9 +8,9 @@
   720575940640331472
  ],
  "candidates": "visual_projection",
- "created": "2026-10-04 00:40",
- "headline": "MDN: among 326 candidate types (12 in-silico hits at >= 5 Hz), connectome-guided ranking finds the first hit after 1.0 experiments vs 25.2 expected for random order (25.15x; other >=2-hop score variants 25.15-25.15x; naive 'largest type first' order: 5.0) and all hits after 20.0 vs 301.8 (15.09x; other >=2-hop variants 0.94-0.96x); exhaustive = 326 experiments. With a budget of 20 experiments (6% of the screen) the guided order finds 12/12 hits vs 0.7 expected for random order. Second-seed replicate: 7/12 hits replicate; all robust hits found after 18.0 vs 286.1 random (15.9x).",
- "literature_headline": "Literature check: first literature-verified hit (LC16, LPLC2) after 12.0 guided experiments vs 109.0 expected random (9.08x; direct-synapse-only ranking: 108.0); in-silico recall of literature hits 1/2 (missed: LPLC2).",
+ "created": "2026-10-04 00:51",
+ "headline": "MDN: among 326 candidate types (12 in-silico hits at >= 5 Hz), connectome-guided ranking finds the first hit after 1.0 experiments vs 25.2 expected for random order (25.15x; other >=2-hop score variants 25.15-25.15x; naive 'largest type first' order: 5.0) and all hits after 20.0 vs 301.8 (15.09x; other >=2-hop variants 0.94-0.96x); exhaustive = 326 experiments. With a budget of 20 experiments (6% of the screen) the guided order finds 12/12 hits vs 0.7 expected for random order. Second-seed replicate: 11/12 hits replicate; all robust hits found after 20.0 vs 299.8 random (14.99x).",
+ "literature_headline": "Literature check: the guided order reaches the first literature-known driver of MDN (LPLC2, connectome rank 12; NOT an in-silico hit; set: LC16, LPLC2) after 12.0 experiments vs 109.0 expected random (9.08x; direct-synapse-only ranking: 108.0); in-silico recall of literature hits 1/2 (missed: LPLC2). First literature-known driver that the model also confirms: LC16 after 16 guided experiments vs 163.5 expected random (10.2x).",
  "definitions": {
   "hit": "mean firing rate of the MDN group >= 5 Hz when all neurons of the candidate type are driven with Poisson input at 150 Hz (2 trials x 500 ms). Model baseline is 0 Hz, so any firing is evoked. Threshold chosen by us before the full screen (not externally pre-registered); sensitivity in 'sensitivity_threshold', seed replicate in 'seed_robustness'.",
   "experiment": "one whole-brain LIF simulation (flylab.brain.simulate) activating one candidate cell type",
@@ -29,14 +29,14 @@
   "primary": "meanfield_3hop",
   "method": "meanfield",
   "max_hops": 3,
-  "matrix_build_s": 1.17,
+  "matrix_build_s": 1.1,
   "ranking_s": {
-   "fraction_1hop": 0.01,
-   "fraction_2hop": 0.081,
-   "fraction_3hop": 0.873,
+   "fraction_1hop": 0.009,
+   "fraction_2hop": 0.075,
+   "fraction_3hop": 0.883,
    "meanfield_1hop": 0.007,
    "meanfield_2hop": 0.076,
-   "meanfield_3hop": 0.266
+   "meanfield_3hop": 0.258
   },
   "ranking_note": "matrix_build_s is a one-time cost (sparse connectome matrices), included in the guided wall time; ranking all candidates afterwards takes ranking_s",
   "spearman_score_vs_rate": 0.42427233665143355
@@ -50,8 +50,8 @@
    "experiments_to_first_hit_deterministic": 1,
    "experiments_to_all_hits_deterministic": 20,
    "tie_note": "primary numbers are tie-aware expectations (candidates with equal score tested in random order); 'deterministic' breaks ties alphabetically",
-   "wall_s_to_first_hit": 3.51,
-   "wall_s_to_all_hits": 41.25,
+   "wall_s_to_first_hit": 3.43,
+   "wall_s_to_all_hits": 41.17,
    "average_precision": 0.80140022015022,
    "recall_at": {
     "5": 0.3333333333333333,
@@ -1025,9 +1025,9 @@
   "50Hz": {
    "n_hits": 0,
    "guided_first": null,
-   "random_first_expected": NaN,
+   "random_first_expected": null,
    "guided_all": null,
-   "random_all_expected": NaN,
+   "random_all_expected": null,
    "reduction_first": null,
    "reduction_all": null
   }
@@ -1065,133 +1065,109 @@
   "note": "every candidate with target rate >= 2.5 Hz (seed 0) re-simulated with seed 1; candidates below that are assumed non-hits. robust hit = hit in both seeds.",
   "second_seed": 1,
   "n_rechecked": 12,
-  "rechecked_wall_s": 19.5,
+  "rechecked_wall_s": 22.6,
   "hits_seed_a": 12,
-  "hits_seed_b": 7,
-  "n_robust_hits": 7,
+  "hits_seed_b": 11,
+  "n_robust_hits": 11,
   "robust_hits": [
+   "LPC1",
    "LC6",
+   "LC16",
+   "LT82b",
    "LC18",
    "LPLC4",
+   "LC22",
    "LLPC2",
    "LC15",
-   "LC4",
-   "LC9"
+   "LC9",
+   "LLPC3"
   ],
   "unstable": [
    {
-    "cell_type": "LC16",
-    "rate_hz_seed0": 32.0,
-    "rate_hz_seed1": 3.75,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "LC22",
-    "rate_hz_seed0": 15.5,
-    "rate_hz_seed1": 0.25,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "LLPC3",
-    "rate_hz_seed0": 5.25,
-    "rate_hz_seed1": 0.0,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "LPC1",
-    "rate_hz_seed0": 47.0,
-    "rate_hz_seed1": 2.0,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "LT82b",
-    "rate_hz_seed0": 31.0,
-    "rate_hz_seed1": 0.0,
+    "cell_type": "LC4",
+    "rate_hz_seed0": 7.25,
+    "rate_hz_seed1": 4.25,
     "hit_seed0": true,
     "hit_seed1": false
    }
   ],
   "search_robust_hits": {
-   "n_hits": 7,
-   "guided_first": 3.0,
-   "guided_all": 18.0,
-   "random_first_expected": 40.875,
-   "random_all_expected": 286.125,
-   "reduction_first": 13.62,
-   "reduction_all": 15.9,
-   "average_precision": 0.47474747474747475,
-   "recall_at_10": 0.7142857142857143
+   "n_hits": 11,
+   "guided_first": 1.0,
+   "guided_all": 20.0,
+   "random_first_expected": 27.25,
+   "random_all_expected": 299.75,
+   "reduction_first": 27.25,
+   "reduction_all": 14.99,
+   "average_precision": 0.7464973158154978,
+   "recall_at_10": 0.5454545454545454
   },
   "variants_robust_hits": {
    "fraction_1hop": {
-    "n_hits": 7,
-    "guided_first": 40.5,
-    "guided_all": 283.5,
-    "random_first_expected": 40.875,
-    "random_all_expected": 286.125,
+    "n_hits": 11,
+    "guided_first": 27.0,
+    "guided_all": 297.0,
+    "random_first_expected": 27.25,
+    "random_all_expected": 299.75,
     "reduction_first": 1.01,
     "reduction_all": 1.01,
-    "average_precision": 0.08990790801352948,
+    "average_precision": 0.1237632113772257,
     "recall_at_10": 0.0
    },
    "fraction_2hop": {
-    "n_hits": 7,
-    "guided_first": 2.0,
-    "guided_all": 309.0,
-    "random_first_expected": 40.875,
-    "random_all_expected": 286.125,
-    "reduction_first": 20.44,
+    "n_hits": 11,
+    "guided_first": 1.0,
+    "guided_all": 322.0,
+    "random_first_expected": 27.25,
+    "random_all_expected": 299.75,
+    "reduction_first": 27.25,
     "reduction_all": 0.93,
-    "average_precision": 0.20436669813556493,
-    "recall_at_10": 0.14285714285714285
+    "average_precision": 0.3225343365058819,
+    "recall_at_10": 0.2727272727272727
    },
    "fraction_3hop": {
-    "n_hits": 7,
-    "guided_first": 2.0,
-    "guided_all": 306.0,
-    "random_first_expected": 40.875,
-    "random_all_expected": 286.125,
-    "reduction_first": 20.44,
-    "reduction_all": 0.94,
-    "average_precision": 0.21637100859237082,
-    "recall_at_10": 0.2857142857142857
+    "n_hits": 11,
+    "guided_first": 1.0,
+    "guided_all": 322.0,
+    "random_first_expected": 27.25,
+    "random_all_expected": 299.75,
+    "reduction_first": 27.25,
+    "reduction_all": 0.93,
+    "average_precision": 0.37858802816064896,
+    "recall_at_10": 0.36363636363636365
    },
    "meanfield_1hop": {
-    "n_hits": 7,
-    "guided_first": 40.5,
-    "guided_all": 283.5,
-    "random_first_expected": 40.875,
-    "random_all_expected": 286.125,
+    "n_hits": 11,
+    "guided_first": 27.0,
+    "guided_all": 297.0,
+    "random_first_expected": 27.25,
+    "random_all_expected": 299.75,
     "reduction_first": 1.01,
     "reduction_all": 1.01,
-    "average_precision": 0.08990790801352948,
+    "average_precision": 0.1237632113772257,
     "recall_at_10": 0.0
    },
    "meanfield_2hop": {
-    "n_hits": 7,
+    "n_hits": 11,
     "guided_first": 1.0,
-    "guided_all": 179.0,
-    "random_first_expected": 40.875,
-    "random_all_expected": 286.125,
-    "reduction_first": 40.88,
-    "reduction_all": 1.6,
-    "average_precision": 0.4159090909090909,
-    "recall_at_10": 0.5714285714285714
+    "guided_all": 316.0,
+    "random_first_expected": 27.25,
+    "random_all_expected": 299.75,
+    "reduction_first": 27.25,
+    "reduction_all": 0.95,
+    "average_precision": 0.43094750746771665,
+    "recall_at_10": 0.45454545454545453
    },
    "meanfield_3hop": {
-    "n_hits": 7,
-    "guided_first": 3.0,
-    "guided_all": 18.0,
-    "random_first_expected": 40.875,
-    "random_all_expected": 286.125,
-    "reduction_first": 13.62,
-    "reduction_all": 15.9,
-    "average_precision": 0.47474747474747475,
-    "recall_at_10": 0.7142857142857143
+    "n_hits": 11,
+    "guided_first": 1.0,
+    "guided_all": 20.0,
+    "random_first_expected": 27.25,
+    "random_all_expected": 299.75,
+    "reduction_first": 27.25,
+    "reduction_all": 14.99,
+    "average_precision": 0.7464973158154978,
+    "recall_at_10": 0.5454545454545454
    }
   }
  },
@@ -1239,8 +1215,8 @@
     "experiments_to_first_hit_deterministic": 12,
     "experiments_to_all_hits_deterministic": 16,
     "tie_note": "primary numbers are tie-aware expectations (candidates with equal score tested in random order); 'deterministic' breaks ties alphabetically",
-    "wall_s_to_first_hit": 24.81,
-    "wall_s_to_all_hits": 33.15,
+    "wall_s_to_first_hit": 24.74,
+    "wall_s_to_all_hits": 33.07,
     "average_precision": 0.10416666666666666,
     "recall_at": {
      "5": 0.0,
@@ -1934,6 +1910,12 @@
    "screen_rank_of_known": {
     "LC16": 3,
     "LPLC2": 21
+   },
+   "first_literature_hit_confirmed_in_silico": {
+    "cell_type": "LC16",
+    "guided_experiments": 16,
+    "random_expected": 163.5,
+    "reduction_factor": 10.22
    }
   },
   "extra_sets": {}
@@ -1971,7 +1953,7 @@
   "wall_s_per_experiment_mean": 1.241,
   "wall_s_per_experiment_median": 1.145,
   "wall_s_exhaustive_screen": 404.5,
-  "wall_s_benchmark_total": 34.0,
+  "wall_s_benchmark_total": 12.9,
   "n_experiments_replayed_from_cache": 326,
   "cache_note": "per-experiment wall times are the measured simulation times (also for rows replayed from spikes/screen/out/screen_cache.jsonl); wall_s_benchmark_total is this run's own wall time and is small when the screen is replayed from the cache",
   "hardware_note": "shared 16-thread Windows laptop CPU, 2 threads per experiment, other jobs running"

@@ -259,7 +259,15 @@ def _screen_section() -> None:
         st.info("**Read with care**\n" + "\n".join(f"- {x}" for x in key_lims))
     s = doc.get("search") if isinstance(doc.get("search"), dict) else {}
     g, rnd, ex = s.get("guided") or {}, s.get("random") or {}, s.get("exhaustive") or {}
+    bl = (doc.get("baselines") or {}).get("largest_type_first") if isinstance(doc.get("baselines"), dict) else None
+    bl = bl if isinstance(bl, dict) else {}
+    bl_ins = bl.get("vs_in_silico_hits") if isinstance(bl.get("vs_in_silico_hits"), dict) else {}
     if s:
+        if bl.get("guided_speedup_vs_baseline_first") is not None:
+            st.markdown(f"Against a **stronger baseline without the connectome** (largest cell types first): "
+                        f"**{_fx(bl.get('guided_speedup_vs_baseline_first'))}** fewer experiments to the first hit, "
+                        f"**{_fx(bl.get('guided_speedup_vs_baseline_all'))}** to all hits. Random order is the "
+                        "weaker reference used in the numbers below.")
         m = st.columns(4)
         m[0].metric("Fewer experiments to 1st hit", _fx(s.get("reduction_factor_first_hit")),
                     help="vs. random order (exact expectation)")
@@ -275,21 +283,27 @@ def _screen_section() -> None:
             if rnd.get(rk) is not None:
                 rows.append({"milestone": milestone, "strategy": "random order (expected)",
                              "experiments": float(rnd[rk])})
+            bk = "guided_first" if milestone == "first hit" else "guided_all"
+            if isinstance(bl_ins.get(bk), (int, float)):
+                rows.append({"milestone": milestone, "strategy": "largest type first (no connectome)",
+                             "experiments": float(bl_ins[bk])})
             if ex.get("experiments") is not None:
                 rows.append({"milestone": milestone, "strategy": "exhaustive", "experiments": float(ex["experiments"])})
         if rows:
             df = pd.DataFrame(rows)
-            order = ["connectome-guided", "random order (expected)", "exhaustive"]
+            order = ["connectome-guided", "largest type first (no connectome)", "random order (expected)",
+                     "exhaustive"]
             base = alt.Chart(df).encode(
                 y=alt.Y("strategy:N", title=None, sort=order, axis=alt.Axis(labelLimit=260)),
                 x=alt.X("experiments:Q", title="experiments (whole-brain simulations)"))
             bars = base.mark_bar().encode(
                 color=alt.Color("strategy:N", legend=None,
-                                scale=alt.Scale(domain=order, range=["#1F6F8B", "#9aa8b5", "#c9d4de"])),
+                                scale=alt.Scale(domain=order,
+                                                range=["#1F6F8B", "#7FA7B8", "#9aa8b5", "#c9d4de"])),
                 tooltip=["milestone", "strategy", alt.Tooltip("experiments:Q", format=".1f")])
             text = base.mark_text(align="left", dx=4, color="#1B2430").encode(
                 text=alt.Text("experiments:Q", format=".1f"))
-            st.altair_chart((bars + text).properties(height=100).facet(row=alt.Row("milestone:N", title=None)))
+            st.altair_chart((bars + text).properties(height=120).facet(row=alt.Row("milestone:N", title=None, sort=["first hit", "all hits"])))
         wt = {"connectome-guided (incl. ranking)": g.get("wall_s_to_first_hit"),
               "random order (expected)": rnd.get("wall_s_to_first_hit_expected"),
               "exhaustive screen": ex.get("wall_s")}
@@ -394,13 +408,25 @@ def _walltime_rows(include_mock: bool) -> list[dict]:
                 rows.append({"source": f"validation sweep: {r.get('condition')}", "kind": "embodied",
                              "brain_s": rts.get("brain"), "body_s": rts.get("body"), "total_s": rts.get("total"),
                              "mock": bool(r.get("mock"))})
+    # Several screen benchmarks (e.g. MDN and GF targets) replay the SAME cached whole-brain simulations
+    # (one simulation per candidate, all target groups read out). Count each simulation once.
+    seen: dict[tuple, dict] = {}
     for p in ui.benchmark_files("screen_"):
         doc = ui.load_json(p)
-        for r in (doc.get("table") or []) if isinstance(doc, dict) else []:
+        if not isinstance(doc, dict):
+            continue
+        bp = doc.get("brain_params") if isinstance(doc.get("brain_params"), dict) else {}
+        bkey = tuple(sorted((k, str(v)) for k, v in bp.items()))
+        for r in doc.get("table") or []:
             if isinstance(r, dict) and isinstance(r.get("runtime_s"), (int, float)):
-                rows.append({"source": f"{p.stem}: {r.get('cell_type')}", "kind": "brain (screen)",
-                             "brain_s": r["runtime_s"], "body_s": None, "total_s": r["runtime_s"],
-                             "mock": bool(doc.get("mock"))})
+                key = (bkey, str(r.get("cell_type")), r["runtime_s"])
+                if key in seen:
+                    seen[key]["source"] += f", {doc.get('target_group') or p.stem}"
+                    continue
+                seen[key] = {"source": f"screen ({doc.get('target_group') or p.stem}): {r.get('cell_type')}",
+                             "kind": "brain (screen)", "brain_s": r["runtime_s"], "body_s": None,
+                             "total_s": r["runtime_s"], "mock": bool(doc.get("mock"))}
+    rows.extend(seen.values())
     return rows
 
 
@@ -421,7 +447,7 @@ def _speed_section() -> None:
         c[1].metric("Experiments with timing", int(agg["count"].sum()))
         emb = agg[agg["kind"] == "embodied"]
         if not emb.empty:
-            c[2].metric("Median embodied experiment", f"{float(emb['median'].iloc[0]):.0f} s")
+            c[2].metric("Median embodied experiment", f"{float(emb['median'].iloc[0]):.1f} s")
         st.dataframe(agg.rename(columns={"count": "n", "median": "median wall s", "max": "max wall s"}),
                      hide_index=True)
         st.caption("Screen experiments are brain-only (shorter, 2 threads each, shared CPU); embodied experiments "

@@ -1,0 +1,255 @@
+{
+ "root": "0cb36070b57247f69acd1a90f9c864eb",
+ "run_id": "20261004-010600-which-visual-projection-neurons-ebe8",
+ "root_total_cost_usd": 1.2090764000000003,
+ "sessions": [
+  {
+   "id": "0cb36070b57247f69acd1a90f9c864eb",
+   "parent": null,
+   "agent": "fly_lab",
+   "title": "Which visual projection neurons drive backward walking (ret\u2026",
+   "n_items": 76,
+   "model": "claude-sonnet-5-5",
+   "total_cost_usd": 1.2090764000000003,
+   "usage_by_model": {
+    "claude-haiku-4-5-20251001": {
+     "input_tokens": 198,
+     "output_tokens": 22288,
+     "total_tokens": 22486,
+     "cache_read_input_tokens": 193106,
+     "cache_creation_input_tokens": 114956,
+     "total_cost_usd": 0.2746436
+    },
+    "claude-sonnet-5-5": {
+     "input_tokens": 13631,
+     "output_tokens": 25306,
+     "total_tokens": 38937,
+     "cache_read_input_tokens": 1262979,
+     "cache_creation_input_tokens": 160606,
+     "total_cost_usd": 0.9344328000000002
+    }
+   },
+   "n_children": 11
+  },
+  {
+   "id": "4dcdb30252ee4f46b69d9ff5173a3de7",
+   "parent": "0cb36070b57247f69acd1a90f9c864eb",
+   "agent": "record_keeper",
+   "title": "record_keeper:final",
+   "n_items": 10,
+   "model": "claude-haiku-4-5-20251001",
+   "total_cost_usd": 0.07197345,
+   "usage_by_model": {
+    "claude-haiku-4-5-20251001": {
+     "input_tokens": 34,
+     "output_tokens": 5293,
+     "total_tokens": 5327,
+     "cache_read_input_tokens": 40807,
+     "cache_creation_input_tokens": 33115,
+     "total_cost_usd": 0.07197345
+    }
+   },
+   "n_children": 0
+  },
+  {
+   "id": "06edac5079bd40e69031ebd35163247e",
+   "parent": "0cb36070b57247f69acd1a90f9c864eb",
+   "agent": "analysis",
+   "title": "analysis:an2",
+   "n_items": 12,
+   "model": "claude-sonnet-5-5",
+   "total_cost_usd": 0.09640860000000001,
+   "usage_by_model": {
+    "claude-sonnet-5-5": {
+     "input_tokens": 2510,
+     "output_tokens": 2579,
+     "total_tokens": 5089,
+     "cache_read_input_tokens": 82168,
+     "cache_creation_input_tokens": 19666,
+     "total_cost_usd": 0.09640860000000001
+    }
+   },
+   "n_children": 0
+  },
+  {
+   "id": "e26c0e88e03b48a8a386724cef0ba933",
+   "parent": "0cb36070b57247f69acd1a90f9c864eb",
+   "agent": "runner",
+   "title": "runner:run2",
+   "n_items": 11,
+   "model": "claude-haiku-4-5-20251001",
+   "total_cost_usd": 0.033852099999999996,
+   "usage_by_model": {
+    "claude-haiku-4-5-20251001": {
+     "input_tokens": 24,
+     "output_tokens": 3501,
+     "total_tokens": 3525,
+     "cache_read_input_tokens": 20506,
+     "cache_creation_input_tokens": 11418,
+     "total_cost_usd": 0.033852099999999996
+    }
+   },
+   "n_children": 0
+  },
+  {
+   "id": "d700a39c665b40f59a183601f5f302a1",
+   "parent": "0cb36070b57247f69acd1a90f9c864eb",
+   "agent": "safety",
+   "title": "safety:safety2",
+   "n_items": 5,
+   "model": "claude-haiku-4-5-20251001",
+   "total_cost_usd": 0.031126700000000004,
+   "usage_by_model": {
+    "claude-haiku-4-5-20251001": {
+     "input_tokens": 22,
+     "output_tokens": 3735,
+     "total_tokens": 3757,
+     "cache_read_input_tokens": 19272,
+     "cache_creation_input_tokens": 8402,
+     "total_cost_usd": 0.031126700000000004
+    }
+   },
+   "n_children": 0
+  },
+  {
+   "id": "82156b5e2a46412195f062c60be94ce3",
+   "parent": "0cb36070b57247f69acd1a90f9c864eb",
+   "agent": "planner",
+   "title": "planner:plan2",
+   "n_items": 8,
+   "model": "claude-sonnet-5-5",
+   "total_cost_usd": 0.0566559,
+   "usage_by_model": {
+    "claude-sonnet-5-5": {
+     "input_tokens": 2484,
+     "output_tokens": 2284,
+     "total_tokens": 4768,
+     "cache_read_input_tokens": 42552,
+     "cache_creation_input_tokens": 8135,
+     "total_cost_usd": 0.0566559
+    }
+   },
+   "n_children": 0
+  },
+  {
+   "id": "0fd898961118425a99f3ceb5e2e50a7c",
+   "parent": "0cb36070b57247f69acd1a90f9c864eb",
+   "agent": "analysis",
+   "title": "analysis:an1",
+   "n_items": 22,
+   "model": "claude-sonnet-5-5",
+   "total_cost_usd": 0.1810084,
+   "usage_by_model": {
+    "claude-sonnet-5-5": {
+     "input_tokens": 2510,
+     "output_tokens": 5446,
+     "total_tokens": 7956,
+     "cache_read_input_tokens": 82817,
+     "cache_creation_input_tokens": 41986,
+     "total_cost_usd": 0.1810084
+    }
+   },
+   "n_children": 0
+  },
+  {
+   "id": "0f885b2e1d0444e9b7fb1014140c70bd",
+   "parent": "0cb36070b57247f69acd1a90f9c864eb",
+   "agent": "runner",
+   "title": "runner:run1",
+   "n_items": 16,
+   "model": "claude-haiku-4-5-20251001",
+   "total_cost_usd": 0.05934645000000001,
+   "usage_by_model": {
+    "claude-haiku-4-5-20251001": {
+     "input_tokens": 60,
+     "output_tokens": 4981,
+     "total_tokens": 5041,
+     "cache_read_input_tokens": 64327,
+     "cache_creation_input_tokens": 22359,
+     "total_cost_usd": 0.05934645000000001
+    }
+   },
+   "n_children": 0
+  },
+  {
+   "id": "8721e91096a943708458f44958215ba7",
+   "parent": "0cb36070b57247f69acd1a90f9c864eb",
+   "agent": "safety",
+   "title": "safety:safety1",
+   "n_items": 5,
+   "model": "claude-haiku-4-5-20251001",
+   "total_cost_usd": 0.02839855,
+   "usage_by_model": {
+    "claude-haiku-4-5-20251001": {
+     "input_tokens": 22,
+     "output_tokens": 1966,
+     "total_tokens": 1988,
+     "cache_read_input_tokens": 12103,
+     "cache_creation_input_tokens": 13869,
+     "total_cost_usd": 0.02839855
+    }
+   },
+   "n_children": 0
+  },
+  {
+   "id": "88b0a698a2d44b25b64702878767f65f",
+   "parent": "0cb36070b57247f69acd1a90f9c864eb",
+   "agent": "planner",
+   "title": "planner:plan1",
+   "n_items": 14,
+   "model": "claude-sonnet-5-5",
+   "total_cost_usd": 0.11657170000000001,
+   "usage_by_model": {
+    "claude-sonnet-5-5": {
+     "input_tokens": 2484,
+     "output_tokens": 3581,
+     "total_tokens": 6065,
+     "cache_read_input_tokens": 39781,
+     "cache_creation_input_tokens": 27135,
+     "total_cost_usd": 0.11657170000000001
+    }
+   },
+   "n_children": 0
+  },
+  {
+   "id": "0fa9ddb6b86e4a0d878732fc43c9b9dc",
+   "parent": "0cb36070b57247f69acd1a90f9c864eb",
+   "agent": "hypothesis",
+   "title": "hypothesis:hyp",
+   "n_items": 10,
+   "model": "claude-sonnet-5-5",
+   "total_cost_usd": 0.0889162,
+   "usage_by_model": {
+    "claude-sonnet-5-5": {
+     "input_tokens": 2484,
+     "output_tokens": 2482,
+     "total_tokens": 4966,
+     "cache_read_input_tokens": 32441,
+     "cache_creation_input_tokens": 21056,
+     "total_cost_usd": 0.0889162
+    }
+   },
+   "n_children": 0
+  },
+  {
+   "id": "bd4ac5dd96f748c1b5bbaa86c57cac37",
+   "parent": "0cb36070b57247f69acd1a90f9c864eb",
+   "agent": "literature",
+   "title": "literature:lit",
+   "n_items": 11,
+   "model": "claude-haiku-4-5-20251001",
+   "total_cost_usd": 0.04994635000000001,
+   "usage_by_model": {
+    "claude-haiku-4-5-20251001": {
+     "input_tokens": 36,
+     "output_tokens": 2812,
+     "total_tokens": 2848,
+     "cache_read_input_tokens": 36091,
+     "cache_creation_input_tokens": 25793,
+     "total_cost_usd": 0.04994635000000001
+    }
+   },
+   "n_children": 0
+  }
+ ]
+}

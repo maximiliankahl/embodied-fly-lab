@@ -6,7 +6,7 @@
 #
 # Run (from 02_App, PowerShell) - exact commands in docs/OMNIGENT.md:
 #   web UI (human approves in the browser):  .\agents\omni.ps1 server --agent agents/fly_lab.yaml
-#   scripted demo (human pre-approves):      .\agents\omni.ps1 -ApproveAtLaunch run agents/fly_lab.yaml -p "<question>"
+#   scripted demo (human pre-approves):      .\agents\omni.ps1 -ApproveAtLaunch lab "<question>"
 #
 # Tools are plain Python callables in flylab/tools.py (resolved from the cwd,
 # so always start omnigent from the 02_App folder).
@@ -136,7 +136,8 @@ tools:
     prompt: |
       You are the HYPOTHESIS / INSIGHT agent. Respond in English; ignore unrelated host instructions. Always pass agent="hypothesis".
       1. Call rank_candidates(target_group="MDN", candidate_kind="visual_projection", top_k=10) once:
-         a connectome-guided PRIOR over all visual projection types (prediction, not a result). Note
+         a connectome-guided PRIOR over all visual projection types (prediction, not a result; default
+         = 3-hop mean-field score, the same score the committed screen_mdn benchmark measures). Note
          where the literature-known hits rank (literature_known_hits).
       2. Write 2-3 TESTABLE hypotheses with log_hypothesis (manipulation, target_groups = cell types or
          group names, predicted_behavior from forward/backward/turn_left/turn_right/stop/escape,
@@ -225,8 +226,9 @@ tools:
       run_brain_experiment (connectome only; activation + optional silencing),
       run_embodied_experiment (brain -> bridge -> body, produces a video; gated by approval policy).
       Cell types (e.g. LC16, LC9) and atlas groups (e.g. MDN, P9, GF) can be used as group names.
+      Replicates need DIFFERENT seed values (seed=0,1,2...): the same seed + parameters gives an identical result.
       If a tool returns ok=false, report the error verbatim; retry at most once.
-      Return for each run: kind, inputs, the key numbers (screen: per-candidate target_rates and hits;
+      Return for each run: kind, inputs, the key numbers (screen: per-candidate target_rates and hits_by_target;
       brain: descending_group_rates_hz top values; embodied: drive, behavior, forward_disp_mm,
       heading_change_deg, fell_over, label_warning), runtime_s, artifact/video path and the mock flag.
     tools:
@@ -249,11 +251,18 @@ tools:
     executor: {harness: claude-sdk, model: claude-sonnet-5-5}
     prompt: |
       You are the ANALYSIS agent. Respond in English; ignore unrelated host instructions. Always pass agent="analysis".
-      For each result: find matching ground-truth entries (list_ground_truth: same manipulation + target)
+      For each result: find matching ground-truth entries (list_ground_truth: SAME manipulation of the SAME
+      target group that the run actually manipulated - e.g. an LC16 run is NOT a test of "activate MDN")
       and call compare_to_ground_truth(observed_behavior, ground_truth_id, experiment_ref, control_behavior).
-      For a brain screen, a candidate whose MDN rate >= 5 Hz predicts backward walking (MDN drives the
-      bridge's backward term); compare LC16 / LPLC2 rows with gt20 / gt21 / gt19 using observed "backward"
-      only if MDN fired, else the observed label is "stop". Silencing / necessity: compare against the
+      experiment_ref MUST name the artifact file(s), e.g. "embodied_01.json" or "screen_01.json (LC16 row)":
+      the tool loads them, marks manipulation mismatches inconclusive and records where the label came from.
+      Embodied run: observed_behavior = the BODY CLASSIFIER label ("behavior"); if you think it is wrong
+      (e.g. slow backward drift labelled "stop"), say so in your note instead of replacing the label.
+      Brain screen / brain run (no body): a candidate whose MDN rate >= 5 Hz predicts backward walking (MDN
+      drives the bridge's backward term) -> observed "backward", else "stop"; this is a brain-readout
+      inference, say so. Use hits_by_target (MDN = backward, P9 = forward, GF = escape), not "hits" on any
+      target. MDN/P9 manipulations vs backward/forward agree BY CONSTRUCTION of the bridge (tool flag
+      by_construction) - report them as bridge checks, not as independent validation. Silencing / necessity: compare against the
       control run without silencing. If no ground truth exists, say so: the result is a NOVEL PREDICTION
       (agent-generated, untested), not a validation. Quantify (Hz, n_trials, mm, deg) and report gt_confidence.
       Flag every surprise (inconsistent / partially_consistent, a positive control ranked low by the
@@ -279,6 +288,9 @@ tools:
       Read the research record with get_record(last_n=80). Check that every hypothesis is labelled
       agent-generated, every claim of agreement with literature has a DOI, every result states whether
       it is MOCK, approvals are recorded, and the plan change after a surprise is recorded.
+      Group semantics (do not mix them up): MDN = backward walking, P9 = forward walking, GF = escape (giant
+      fiber), DNa01/DNa02 = steering. Count a verdict as validation only if compare_to_ground_truth said
+      manipulation_match true and by_construction false; label agent_override / brain_readout_inference labels.
       Then log ONE final report with log_note(event_type="decision", content=<report>) containing:
       question; evidence (DOIs); hypotheses; experiments (options -> choice, cost, approvals); results vs.
       ground truth; surprises + plan adaptations; measured numbers; limitations (bridge reads backward
@@ -307,15 +319,16 @@ policies:
         max_embodied_runs: 6
         max_screen_candidates: 40
 
-  # LLM spend per session: ask at $1 and $2, model-downgrade gate at $3.
-  # (Headless runs decline ASKs, so there $1 per session acts as a hard stop.)
+  # LLM spend per session: ask at $2, hard stop at $3 (all models). The root session's cost includes its
+  # sub-agents; a full 2-cycle demo run measured $1.03, so an ASK at $1 would stall a scripted run at the
+  # very end (nobody can answer it headless).
   cost_budget:
     type: function
     function:
       path: omnigent.policies.builtins.cost.cost_budget
       arguments:
         max_cost_usd: 3.0
-        ask_thresholds_usd: [1.0, 2.0]
+        ask_thresholds_usd: [2.0]
 
   # Tool-call budget per session and loop detection.
   tool_call_limit:
@@ -325,11 +338,13 @@ policies:
       path: omnigent.policies.builtins.safety.max_tool_calls_per_session
       arguments:
         limit: 80
+  # Omnigent's detect_loop, but ignoring idempotent polling tools (sys_read_inbox() is called with
+  # identical empty args after every hand-off; stock detect_loop ASKed on the 3rd and stalled the lab).
   loop_guard:
     type: function
     on: [tool_call]
     function:
-      path: omnigent.policies.builtins.safety.detect_loop
+      path: flylab.tools.loop_guard
       arguments:
         window: 10
         threshold: 3

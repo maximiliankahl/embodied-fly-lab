@@ -111,7 +111,7 @@ if ($mockValue) {
     New-Item -ItemType Directory -Force (Split-Path -Parent $mockFlag) | Out-Null
     Set-Content -Path $mockFlag -Value $mockValue -Encoding ascii
     Write-Host "FLYLAB_MOCK=$mockValue (mocked components return data labelled MOCK; flag file data\cache\FLYLAB_MOCK)"
-} elseif ($OmniArgs.Count -gt 0 -and @("run", "server", "start") -contains $OmniArgs[0]) {
+} elseif ($OmniArgs.Count -gt 0 -and @("run", "server", "start", "lab") -contains $OmniArgs[0]) {
     if (Test-Path $mockFlag) { Remove-Item $mockFlag -Force; Write-Host "mock flag removed (real science modules)" }
 }
 
@@ -157,7 +157,13 @@ if ($EnvModel -and $OmniArgs[0] -eq "run" -and $env:ANTHROPIC_MODEL) {
 }
 $code = 1  # stays 1 if uv itself cannot be started
 try {
-    & uv run omnigent @OmniArgs
+    if ($OmniArgs[0] -eq "lab") {
+        # Scripted full-lab run that follows every sub-agent (agents/run_lab.py) + transcript export.
+        $rest = @($OmniArgs | Select-Object -Skip 1)
+        & uv run python agents/run_lab.py @rest
+    } else {
+        & uv run omnigent @OmniArgs
+    }
     $code = $LASTEXITCODE
 } finally {
     # Mock mode and pre-approval only last for this command (flag files must not leak into later runs).

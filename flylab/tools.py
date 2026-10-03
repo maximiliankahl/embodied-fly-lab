@@ -25,6 +25,7 @@ derives JSON schemas from real annotation objects.
 """
 
 import json
+import re
 import os
 import time
 import traceback
@@ -290,7 +291,7 @@ def _group_rates(rates: dict[str, float], role: str | None = "descending") -> di
 
 
 def _simulate_brain(excite_names: list[str], silence_names: list[str], rate_hz: float,
-                    duration_ms: float, n_trials: int) -> tuple[dict, dict]:
+                    duration_ms: float, n_trials: int, seed: int = 0) -> tuple[dict, dict]:
     ex_ids, ex_counts, ex_unknown = _resolve_groups(excite_names)
     si_ids, si_counts, si_unknown = _resolve_groups(silence_names)
     meta = {"excite_groups": ex_counts, "silence_groups": si_counts,
@@ -303,7 +304,7 @@ def _simulate_brain(excite_names: list[str], silence_names: list[str], rate_hz: 
     else:
         from flylab import brain
         res = brain.simulate(ex_ids, si_ids or None, excite_rate_hz=float(rate_hz),
-                             duration_ms=float(duration_ms), n_trials=int(n_trials))
+                             duration_ms=float(duration_ms), n_trials=int(n_trials), seed=int(seed))
     return res, meta
 
 
@@ -339,13 +340,13 @@ def _drive_from_rates(rates: dict[str, float]) -> tuple[dict, dict]:
     return drive, info
 
 
-def _simulate_body(drive: dict, duration_s: float, render_path: str | None) -> dict:
+def _simulate_body(drive: dict, duration_s: float, render_path: str | None, seed: int = 0) -> dict:
     clean = {"forward": float(drive.get("forward", 0.0)), "turn": float(drive.get("turn", 0.0)),
              "backward": float(drive.get("backward", 0.0))}
     if _mock("body"):
         return _mock_body(clean, duration_s)
     from flylab import body
-    return body.simulate_walk(clean, duration_s=float(duration_s), render_path=render_path)
+    return body.simulate_walk(clean, duration_s=float(duration_s), render_path=render_path, seed=int(seed))
 
 
 def _rel(p: str | None) -> str | None:
@@ -674,7 +675,7 @@ def request_approval(action: str, reason: str, est_cost: float = 0.0, agent: str
 
 
 def run_brain_experiment(excite_groups: list, silence_groups: list = None, rate_hz: float = 150.0,
-                         duration_ms: float = 1000.0, n_trials: int = 3, agent: str = "runner",
+                         duration_ms: float = 1000.0, n_trials: int = 3, seed: int = 0, agent: str = "runner",
                          run_id: str = "") -> dict:
     """In-silico activation/silencing in the whole-brain LIF connectome model (FlyWire v783, after Shiu et al. 2024).
     :param excite_groups: Group names (or root ids) driven with Poisson input, e.g. ["MDN"].
@@ -682,6 +683,8 @@ def run_brain_experiment(excite_groups: list, silence_groups: list = None, rate_
     :param rate_hz: Poisson rate of the excitation (Hz). Default 150.
     :param duration_ms: Simulated time per trial (ms). Default 1000.
     :param n_trials: Number of trials (each costs compute). Default 3.
+    :param seed: Random seed of the Poisson input; the same seed + parameters gives an IDENTICAL result, so use
+        different seeds for independent replicates.
     :param agent: Calling agent role name.
     :param run_id: Run id; default = active run.
     :returns: descending-neuron group rates (Hz), top responding neurons, n_active, runtime_s,
@@ -691,7 +694,7 @@ def run_brain_experiment(excite_groups: list, silence_groups: list = None, rate_
     ex, si = _as_list(excite_groups), _as_list(silence_groups)
     try:
         t0 = time.time()
-        res, meta = _simulate_brain(ex, si, rate_hz, duration_ms, n_trials)
+        res, meta = _simulate_brain(ex, si, rate_hz, duration_ms, n_trials, seed)
         rates = {str(k): float(v) for k, v in (res.get("rates") or {}).items()}
         top = sorted(rates.items(), key=lambda kv: kv[1], reverse=True)[:15]
         dn = _group_rates(rates, "descending")
@@ -700,8 +703,9 @@ def run_brain_experiment(excite_groups: list, silence_groups: list = None, rate_
         other = {k: v for k, v in _group_rates(rates, None).items() if k not in dn and v > 0}
         other = dict(sorted(other.items(), key=lambda kv: kv[1], reverse=True)[:25])
         path = _save_json(_next_artifact(rid, "brain", "json"), {"inputs": {"excite": ex, "silence": si,
-                          "rate_hz": rate_hz, "duration_ms": duration_ms, "n_trials": n_trials}, **meta, "result": res})
-        out = {"ok": True, "run_id": rid, "kind": "brain", "excite": ex, "silence": si, **meta,
+                          "rate_hz": rate_hz, "duration_ms": duration_ms, "n_trials": n_trials, "seed": seed},
+                          **meta, "result": res})
+        out = {"ok": True, "run_id": rid, "kind": "brain", "excite": ex, "silence": si, "seed": seed, **meta,
                "descending_group_rates_hz": dn, "other_group_rates_hz": other,
                "top_neurons": [{"root_id": k, "rate_hz": round(v, 2)} for k, v in top],
                "n_active": res.get("n_active", len(rates)), "runtime_s": res.get("runtime_s", round(time.time() - t0, 2)),
@@ -712,7 +716,7 @@ def run_brain_experiment(excite_groups: list, silence_groups: list = None, rate_
         record.log_event(rid, agent, "experiment_result",
                          f"Brain sim: excite={ex} silence={si} -> {out['n_active']} active neurons"
                          + (" [MOCK]" if _mock("brain") else ""),
-                         {k: out[k] for k in ("kind", "excite", "silence", "descending_group_rates_hz",
+                         {k: out[k] for k in ("kind", "excite", "silence", "seed", "descending_group_rates_hz",
                                               "other_group_rates_hz", "n_active", "n_unknown_ids",
                                               "runtime_s", "artifact", "mock", "unknown_groups")})
         return out
@@ -751,7 +755,7 @@ def run_body_experiment(forward: float = 1.0, turn: float = 0.0, backward: float
 
 def run_embodied_experiment(excite_groups: list, silence_groups: list = None, rate_hz: float = 150.0,
                             duration_ms: float = 1000.0, n_trials: int = 3, duration_s: float = 1.0,
-                            agent: str = "runner", run_id: str = "") -> dict:
+                            seed: int = 0, agent: str = "runner", run_id: str = "") -> dict:
     """Full closed chain: connectome brain -> descending-neuron rates -> bridge -> physics body -> behavior + video.
     EXPENSIVE: requires human approval (Omnigent policy approval_gate).
     :param excite_groups: Group names (or root ids) to activate, e.g. ["MDN"].
@@ -760,6 +764,7 @@ def run_embodied_experiment(excite_groups: list, silence_groups: list = None, ra
     :param duration_ms: Brain simulation time per trial (ms).
     :param n_trials: Brain trials.
     :param duration_s: Body simulation time (s).
+    :param seed: Random seed of brain input and body (same seed + parameters = identical result).
     :param agent: Calling agent role name.
     :param run_id: Run id; default = active run.
     :returns: descending rates, drive, behavior, body metrics, video path (runs/<id>/artifacts), runtimes.
@@ -767,17 +772,17 @@ def run_embodied_experiment(excite_groups: list, silence_groups: list = None, ra
     rid = _rid(run_id)
     ex, si = _as_list(excite_groups), _as_list(silence_groups)
     try:
-        bres, meta = _simulate_brain(ex, si, rate_hz, duration_ms, n_trials)
+        bres, meta = _simulate_brain(ex, si, rate_hz, duration_ms, n_trials, seed)
         rates = {str(k): float(v) for k, v in (bres.get("rates") or {}).items()}
         dn = _group_rates(rates, "descending")
         drive, bridge_info = _drive_from_rates(rates)
         video_path = _next_artifact(rid, "embodied", "mp4")  # .json below shares the number
-        body_res = _simulate_body(drive, duration_s, str(video_path))
+        body_res = _simulate_body(drive, duration_s, str(video_path), seed)
         summ = _body_summary(body_res, duration_s)
         mock = any(_mock(c) for c in ("brain", "bridge", "body"))
         path = _save_json(video_path.with_suffix(".json"),
                           {"inputs": {"excite": ex, "silence": si, "rate_hz": rate_hz, "duration_ms": duration_ms,
-                                      "n_trials": n_trials, "duration_s": duration_s}, **meta,
+                                      "n_trials": n_trials, "duration_s": duration_s, "seed": seed}, **meta,
                            "descending_group_rates_hz": dn, "drive": drive, "bridge": bridge_info, "body": body_res,
                            "brain_runtime_s": bres.get("runtime_s"), "mock": mock})
         out = {"ok": True, "run_id": rid, "kind": "embodied", "excite": ex, "silence": si, **meta,
@@ -801,6 +806,69 @@ def run_embodied_experiment(excite_groups: list, silence_groups: list = None, ra
 
 
 # =========================================================================== analysis tools
+
+# Mirrors flylab.bridge.rates_to_drive (backward = MDN, forward = P9): comparing these groups' manipulation with
+# the behavior they are wired to is a check of the hand-designed bridge + body, not an independent test.
+_BRIDGE_SOURCE = {"backward": ("MDN",), "forward": ("P9",)}
+_ARTIFACT_RE = re.compile(r"\b((?:embodied|brain|screen|body)_\d+)", re.IGNORECASE)
+
+
+def _same_group(a: str, b: str) -> bool:
+    a, b = str(a).strip().lower(), str(b).strip().lower()
+    return a == b or a.startswith(b + "_") or b.startswith(a + "_")
+
+
+def _check_experiment_ref(rid: str, experiment_ref: str, entry: dict, obs: str) -> dict:
+    """Load the artifacts named in experiment_ref (e.g. "embodied_01.json + screen_01") and check
+    (a) that they apply the published manipulation to the published target group, (b) where the observed
+    label comes from (body classifier vs agent override vs brain-readout inference). Never raises."""
+    out = {"manipulation_match": None, "manipulated": None, "label_source": "unverified", "body_label": None,
+           "by_construction": False, "note": ""}
+    tgt = str(entry.get("target_group") or "")
+    exp = str(entry.get("expected_behavior") or "").lower()
+    if any(_same_group(tgt, g) for g in _BRIDGE_SOURCE.get(exp, ())):
+        out["by_construction"] = True
+        out["note"] = (f"{tgt} -> {exp} is wired into the bridge by construction; agreement checks the bridge/body, "
+                       "it is not independent evidence.")
+    try:
+        names = sorted({m.lower() for m in _ARTIFACT_RE.findall(str(experiment_ref or ""))})
+        arts = []
+        for n in names:
+            p = record.artifacts_dir(rid) / f"{n}.json"
+            if p.exists():
+                arts.append((n, json.loads(p.read_text(encoding="utf-8"))))
+        if not arts:
+            out["note"] = (out["note"] + " " if out["note"] else "") + \
+                "experiment_ref names no artifact of this run - manipulation and label source unverified."
+            return out
+        manip, body_labels = {}, []
+        for n, a in arts:
+            inp = a.get("inputs") or {}
+            ex = _as_list(inp.get("candidates") if n.startswith("screen") else inp.get("excite"))
+            si = _as_list(inp.get("silence"))
+            manip[n] = {"excite": ex, "silence": si}
+            if n.startswith("embodied") and isinstance(a.get("body"), dict) and a["body"].get("behavior"):
+                body_labels.append(str(a["body"]["behavior"]))
+        out["manipulated"] = manip
+        key = "silence" if str(entry.get("manipulation")) == "silence" else "excite"
+        out["manipulation_match"] = any(_same_group(tgt, g) for m in manip.values() for g in m[key])
+        if not out["manipulation_match"]:
+            out["note"] = (out["note"] + " " if out["note"] else "") + (
+                f"manipulation mismatch: this entry is '{entry.get('manipulation')} {tgt}', but the referenced "
+                f"experiment(s) {manip} did not {entry.get('manipulation')} {tgt} - not a test of this entry.")
+        if body_labels:
+            out["body_label"] = body_labels[0] if len(set(body_labels)) == 1 else body_labels
+            if obs in body_labels:
+                out["label_source"] = "body_classifier"
+            else:
+                out["label_source"] = "agent_override"
+                out["note"] = (out["note"] + " " if out["note"] else "") + (
+                    f"observed '{obs}' is the agent's label; the body classifier labelled the run {body_labels}.")
+        else:
+            out["label_source"] = "brain_readout_inference"
+    except Exception as exc:  # the check is advisory; never break the comparison
+        out["note"] = (out["note"] + " " if out["note"] else "") + f"experiment_ref check failed: {exc}"
+    return out
 
 
 def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experiment_ref: str = "",
@@ -868,6 +936,15 @@ def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experi
         if comparable and exp not in BODY_BEHAVIORS:
             note = (note + " " if note else "") + (f"NOTE: '{exp}' is not a body-model behavior; the observed label "
                                                     "is an agent interpretation of brain readouts.")
+        # Check the referenced experiment(s) against the published manipulation and the label provenance
+        # (review 2026-10-04: an LC16 run was logged as 'consistent' with "MDN activation -> backward", and an
+        # agent-chosen 'backward' label was logged although the body classifier said 'stop').
+        chk = _check_experiment_ref(rid, experiment_ref, entry, obs)
+        if chk["manipulation_match"] is False:
+            verdict, comparable = "inconclusive", False
+            note = (note + " " if note else "") + chk["note"]
+        elif chk["note"]:
+            note = (note + " " if note else "") + chk["note"]
         surprise = verdict in ("inconsistent", "partially_consistent")
         cit = entry.get("citation") or {}
         doi = cit.get("doi") if isinstance(cit, dict) else None
@@ -877,14 +954,27 @@ def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experi
                "comparable": comparable, "readout_group": readout,
                "gt_confidence": entry.get("confidence"), "gt_note": entry.get("note"),
                "evidence": entry.get("evidence"), "citation": cit, "experiment_ref": experiment_ref,
-               "mock": bool(entry.get("mock"))}
+               "manipulation_match": chk["manipulation_match"], "manipulated": chk["manipulated"],
+               "label_source": chk["label_source"], "body_label": chk["body_label"],
+               "by_construction": chk["by_construction"], "mock": bool(entry.get("mock"))}
+        tags = []
+        if chk["label_source"] == "agent_override":
+            tags.append(f"agent label; body classifier said {chk['body_label']}")
+        elif chk["label_source"] == "brain_readout_inference":
+            tags.append("label inferred from brain readout, no body run")
+        if chk["by_construction"]:
+            tags.append("bridge maps this group to this behavior by construction")
+        if chk["manipulation_match"] is False:
+            tags.append("NOT a test of this entry: manipulation mismatch")
         record.log_event(rid, agent, "analysis",
                          f"{ground_truth_id} ({effect} {exp}): observed {obs}"
                          + (f", control {ctrl}" if ctrl else "") + f" -> {verdict}"
+                         + (f" [{'; '.join(tags)}]" if tags else "")
                          + (" (SURPRISE - reopen assumptions)" if surprise else ""),
                          {k: out[k] for k in ("ground_truth_id", "manipulation", "target_group", "effect", "expected",
                                               "observed", "control", "verdict", "note", "surprise", "comparable",
-                                              "readout_group", "gt_confidence", "experiment_ref", "mock")},
+                                              "readout_group", "gt_confidence", "experiment_ref", "manipulation_match",
+                                              "manipulated", "label_source", "body_label", "by_construction", "mock")},
                          [doi] if doi else [])
         return out
     except Exception as exc:
@@ -909,14 +999,15 @@ def _screen_known_hits(target_group: str) -> dict:
 
 
 def rank_candidates(target_group: str, candidate_kind: str = "visual_projection", top_k: int = 10,
-                    max_hops: int = 2, agent: str = "hypothesis", run_id: str = "") -> dict:
+                    max_hops: int = 3, agent: str = "hypothesis", run_id: str = "") -> dict:
     """Connectome-guided prior: rank ALL candidate cell types (e.g. the 326 FlyWire visual projection types) by how
     strongly the signed FlyWire v783 connectome predicts they excite a target group (e.g. MDN = moonwalker / backward
     walking). Cheap (seconds, no simulation). A high score is a PREDICTION to be tested with run_brain_screen, not a result.
     :param target_group: Target neuron group, e.g. "MDN" (backward walking) or "GF" (escape).
     :param candidate_kind: "visual_projection", "descending", "ascending", "sensory" or a regex on cell types.
     :param top_k: How many top-ranked candidates to return (1-40).
-    :param max_hops: Path length considered (1 = direct synapses only, 2 = + two-hop excitatory paths).
+    :param max_hops: Path length considered (1 = direct synapses only; default 3 = the primary score of the committed
+        screen benchmark, data/benchmarks/screen_mdn.json; 2 hops misses LC16 -> MDN).
     :param agent: Calling agent role name.
     :param run_id: Run id; default = active run.
     :returns: {"n_candidates", "top": [{rank, cell_type, n, score, direct_syn, two_hop_score, sign_note}],
@@ -929,13 +1020,15 @@ def rank_candidates(target_group: str, candidate_kind: str = "visual_projection"
         if _mock("screen"):
             ranked = [{"rank": i + 1, "cell_type": c, "n": 10 + i, "score": round(0.003 / (i + 1), 6), "direct_syn": 0,
                        "two_hop_score": round(0.003 / (i + 1), 6), "sign_note": "MOCK"} for i, c in enumerate(_MOCK_SCREEN_TYPES)]
-            n_total, known = len(ranked), {}
+            n_total, known, method_used = len(ranked), {}, "MOCK"
         else:
             from flylab import screen
             full = screen.rank_by_connectome(target_group, candidate_kind, max_hops=int(max_hops))
             n_total = len(full)
-            ranked = [{k: r.get(k) for k in ("rank", "cell_type", "n", "score", "direct_syn", "two_hop_score", "sign_note")}
+            ranked = [{k: r.get(k) for k in ("rank", "cell_type", "n", "score", "pred_rate_hz", "direct_syn",
+                                             "two_hop_score", "sign_note")}
                       for r in full[:top_k]]
+            method_used = (full[0].get("method") if full else None) or "meanfield"
             pos = {r["cell_type"]: r for r in full}
             known = {ct: {"rank": pos[ct]["rank"] if ct in pos else None,
                           "score": pos[ct]["score"] if ct in pos else None, "gt_ids": gts}
@@ -946,8 +1039,8 @@ def rank_candidates(target_group: str, candidate_kind: str = "visual_projection"
         out = {"ok": True, "run_id": rid, "target_group": target_group, "candidate_kind": candidate_kind,
                "n_candidates": n_total, "top_k": top_k, "top": ranked, "literature_known_hits": known,
                "runtime_s": round(time.time() - t0, 2), "max_hops": max_hops,
-               "method": "signed input-fraction connectome score, direct + 2-hop excitatory paths "
-                         "(flylab.screen.rank_by_connectome); a prior from the SAME connectome the brain model uses",
+               "method": (f"{'MOCK' if _mock('screen') else method_used} connectome score over {max_hops} hops "
+                          "(flylab.screen.rank_by_connectome); a prior from the SAME connectome the brain model uses"),
                "mock": _mock("screen")}
         if _mock("screen"):
             out["notice"] = MOCK_NOTICE
@@ -964,7 +1057,7 @@ def rank_candidates(target_group: str, candidate_kind: str = "visual_projection"
 
 
 def run_brain_screen(candidates: list, target_groups: list, rate_hz: float = 150.0, duration_ms: float = 500.0,
-                     n_trials: int = 2, agent: str = "runner", run_id: str = "") -> dict:
+                     n_trials: int = 2, seed: int = 0, agent: str = "runner", run_id: str = "") -> dict:
     """In-silico activation screen: activate each candidate cell type (all its neurons, Poisson input) in the whole-brain
     LIF model (FlyWire v783, Shiu et al. 2024) and read the mean firing rate of each target group. A candidate is a HIT
     when a target fires >= 5 Hz (model baseline is 0 Hz). Cost ~1 s wall per candidate per trial-second.
@@ -974,6 +1067,7 @@ def run_brain_screen(candidates: list, target_groups: list, rate_hz: float = 150
     :param rate_hz: Poisson activation rate (Hz).
     :param duration_ms: Simulated time per trial (ms).
     :param n_trials: Trials per candidate.
+    :param seed: Random seed (default 0 = the seed of the committed benchmark, so rows may come from its cache).
     :param agent: Calling agent role name.
     :param run_id: Run id; default = active run.
     :returns: {"rows": [{cell_type, n_stimulated, target_rates, hit_targets, runtime_s, cached}], "hits", "runtime_s"}
@@ -991,28 +1085,35 @@ def run_brain_screen(candidates: list, target_groups: list, rate_hz: float = 150
         else:
             from flylab import screen
             rows = screen.brain_screen(cands, targets, rate_hz=float(rate_hz), duration_ms=float(duration_ms),
-                                       n_trials=int(n_trials), n_threads=4)
+                                       n_trials=int(n_trials), seed=int(seed), n_threads=4)
         for r in rows:
             r["hit_targets"] = [g for g, v in (r.get("target_rates") or {}).items() if float(v) >= SCREEN_HIT_HZ]
         hits = [r["cell_type"] for r in rows if r["hit_targets"]]
+        # Per-target hits: with several targets (MDN, P9, GF) "hit on any target" mixes behaviours
+        # (MDN = backward, P9 = forward, GF = escape); report them separately.
+        hits_by_target = {g: [r["cell_type"] for r in rows if g in r["hit_targets"]] for g in targets}
         wall = round(time.time() - t0, 2)
         mock = _mock("screen")
         path = _save_json(_next_artifact(rid, "screen", "json"),
                           {"inputs": {"candidates": cands, "target_groups": targets, "rate_hz": rate_hz,
-                                      "duration_ms": duration_ms, "n_trials": n_trials},
-                           "hit_threshold_hz": SCREEN_HIT_HZ, "rows": rows, "hits": hits, "wall_s": wall, "mock": mock})
+                                      "duration_ms": duration_ms, "n_trials": n_trials, "seed": seed},
+                           "hit_threshold_hz": SCREEN_HIT_HZ, "rows": rows, "hits": hits, "hits_by_target": hits_by_target,
+                           "wall_s": wall, "mock": mock})
         out = {"ok": True, "run_id": rid, "kind": "screen", "n_candidates": len(cands), "target_groups": targets,
-               "rows": rows, "hits": hits, "hit_threshold_hz": SCREEN_HIT_HZ, "runtime_s": wall,
+               "rows": rows, "hits": hits, "hits_by_target": hits_by_target, "hit_threshold_hz": SCREEN_HIT_HZ,
+               "runtime_s": wall,
                "sim_runtime_s_sum": round(sum(float(r.get("runtime_s") or 0) for r in rows), 2),
                "n_cached": sum(1 for r in rows if r.get("cached")), "artifact": path, "mock": mock,
                "note": "cached rows were simulated earlier with identical parameters (runtime_s = original measured time)"}
         if mock:
             out["notice"] = MOCK_NOTICE
         record.log_event(rid, agent, "experiment_result",
-                         f"Brain screen: {len(cands)} candidates -> {targets}; hits (>= {SCREEN_HIT_HZ} Hz): {hits or 'none'}"
+                         f"Brain screen: {len(cands)} candidates; hits (>= {SCREEN_HIT_HZ} Hz) per target: "
+                         + "; ".join(f"{g}: {', '.join(v) or 'none'}" for g, v in hits_by_target.items())
                          + (" [MOCK]" if mock else ""),
                          {"kind": "screen", "candidates": cands, "target_groups": targets, "rate_hz": rate_hz,
                           "duration_ms": duration_ms, "n_trials": n_trials, "rows": rows, "hits": hits,
+                          "hits_by_target": hits_by_target,
                           "runtime_s": wall, "artifact": path, "mock": mock})
         return out
     except Exception as exc:
@@ -1033,6 +1134,7 @@ def get_benchmark(name: str = "", agent: str = "", run_id: str = "") -> dict:
         if not name:
             return {"ok": True, "available": avail}
         stem = Path(str(name)).stem
+        stem = next((a for a in avail if a.lower() == stem.lower()), stem)  # "screen_MDN" -> screen_mdn.json (Linux too)
         path = bdir / f"{stem}.json"
         if not path.exists():
             if _mock("screen"):
@@ -1176,6 +1278,28 @@ def approval_gate(ask_tools: list = None, brain_ms_threshold: float = 10000.0, m
     return evaluate
 
 
+_LOOP_IGNORE_DEFAULT = ("sys_read_inbox", "sys_session_status", "sys_list_sessions", "get_record", "list_ground_truth")
+
+
+def loop_guard(window: int = 10, threshold: int = 3, ignore_tools: list = None):
+    """Omnigent policy factory: Omnigent's ``detect_loop`` (ASK when the same tool call repeats ``threshold``
+    times in ``window`` calls), except for idempotent polling/read tools. Needed because the PI calls
+    ``sys_read_inbox()`` with identical (empty) arguments after every specialist; stock ``detect_loop`` then
+    ASKs on the 3rd hand-off and the lab stalls waiting for a human (observed live 2026-10-04 00:48).
+    """
+    from omnigent.policies.builtins.safety import detect_loop
+    inner = detect_loop(window=window, threshold=threshold)
+    ignore = set(ignore_tools or _LOOP_IGNORE_DEFAULT)
+
+    def evaluate(event: dict):
+        if event.get("type") == "tool_call":
+            data = event.get("data") or {}
+            if _bare(str(data.get("name") or data.get("tool") or "")) in ignore:
+                return None
+        return inner(event)
+    return evaluate
+
+
 # =========================================================================== self-test
 
 
@@ -1233,6 +1357,14 @@ def _selftest(keep: bool = False) -> int:
         assert pol({"type": "tool_call", "session_state": {"_flylab_embodied_runs": 6},
                     "data": {"name": "run_embodied_experiment", "arguments": {}}})["result"] == "DENY"
         assert steps[17]["hits"] == ["MOCK_LC16"], steps[17]
+        assert steps[17]["hits_by_target"] == {"MDN": ["MOCK_LC16"]}, steps[17]
+        # experiment_ref check: embodied_01 activated MDN -> matches gt MDN-activate, not gt P9-activate
+        c_ok = compare_to_ground_truth(steps[10]["behavior"], "gt_mock_mdn_activate", "embodied_01.json")
+        assert c_ok["manipulation_match"] is True and c_ok["label_source"] == "body_classifier", c_ok
+        assert c_ok["by_construction"] is True, c_ok  # MDN -> backward is wired into the bridge
+        c_bad = compare_to_ground_truth("forward", "gt_mock_p9_activate", "embodied_01.json")
+        assert c_bad["manipulation_match"] is False and c_bad["verdict"] == "inconclusive", c_bad
+        assert c_bad["label_source"] == "agent_override" and c_bad["surprise"] is False, c_bad
         assert steps[19]["denied_by_policy"] is True and steps[19]["cost_units"] > 50, steps[19]
         big = {"type": "tool_call", "data": {"name": "run_brain_screen",
                                              "arguments": {"candidates": [f"T{i}" for i in range(41)], "target_groups": ["MDN"]}}}

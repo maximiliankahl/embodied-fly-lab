@@ -1,6 +1,6 @@
 {
  "what": "End-to-end embodied validation: FlyWire v783 LIF brain -> flylab.bridge -> NeuroMechFly body",
- "created": "2026-10-04 00:38:09",
+ "created": "2026-10-04 00:50:41",
  "protocol": {
   "brain_duration_ms": 1000.0,
   "n_trials": 3,
@@ -238,7 +238,7 @@
      0.0,
      0.0
     ],
-    "runtime_s": 4.48,
+    "runtime_s": 4.58,
     "control_every": 5
    },
    "brain_readouts": {
@@ -272,8 +272,8 @@
    "verdict": "no_ground_truth",
    "runtimes_s": {
     "brain": 0.0,
-    "body": 4.48,
-    "total": 6.92
+    "body": 4.58,
+    "total": 6.86
    },
    "video": "assets/embodied/control.mp4",
    "note": "No stimulation. The Shiu et al. model has 0 Hz baseline, so the brain is silent (not simulated) and the body receives a zero drive.",
@@ -335,7 +335,7 @@
      -1.2,
      -1.2
     ],
-    "runtime_s": 4.28,
+    "runtime_s": 4.23,
     "control_every": 5
    },
    "brain_readouts": {
@@ -379,9 +379,9 @@
    "gt_id": "gt01_mdn_activate_backward",
    "verdict": "consistent",
    "runtimes_s": {
-    "brain": 2.794,
-    "body": 4.28,
-    "total": 7.08
+    "brain": 2.961,
+    "body": 4.23,
+    "total": 7.2
    },
    "video": "assets/embodied/MDN_bilateral.mp4",
    "note": "MDN_R fires above MDN_L in the brain model, but MDN asymmetry is not mapped to turning; the heading drift comes from the reversed-kinematics backward gait of the body model.",
@@ -443,7 +443,7 @@
      1.2,
      0.993
     ],
-    "runtime_s": 4.31,
+    "runtime_s": 4.38,
     "control_every": 5
    },
    "brain_readouts": {
@@ -487,9 +487,9 @@
    "gt_id": "gt03_p9_activate_forward",
    "verdict": "consistent",
    "runtimes_s": {
-    "brain": 3.134,
-    "body": 4.31,
-    "total": 7.45
+    "brain": 3.212,
+    "body": 4.38,
+    "total": 7.59
    },
    "video": "assets/embodied/P9_bilateral.mp4",
    "note": "P9 recruits DNa02 (R > L) via the connectome -> small rightward turn term; label stays forward.",
@@ -551,7 +551,7 @@
      -0.1357,
      1.2
     ],
-    "runtime_s": 4.62,
+    "runtime_s": 4.69,
     "control_every": 5
    },
    "brain_readouts": {
@@ -595,9 +595,9 @@
    "gt_id": "gt04_p9L_activate_turn_left",
    "verdict": "consistent",
    "runtimes_s": {
-    "brain": 2.664,
-    "body": 4.62,
-    "total": 7.29
+    "brain": 2.754,
+    "body": 4.69,
+    "total": 7.45
    },
    "video": "assets/embodied/P9_L.mp4",
    "note": "Turn direction matches (ipsilateral, recruited DNa02_L adds to it), but with forward 0.49 and turn -0.62 the body turns almost in place (net forward displacement ~0 mm): the 'forward walking' part of 'forward walking with ipsilateral turning' (Bidaye et al. 2020) is not reproduced by this mapping.",
@@ -659,7 +659,7 @@
      -1.184,
      1.184
     ],
-    "runtime_s": 4.65,
+    "runtime_s": 4.59,
     "control_every": 5
    },
    "brain_readouts": {
@@ -703,9 +703,9 @@
    "gt_id": "gt05_dna02L_activate_turn_left",
    "verdict": "consistent",
    "runtimes_s": {
-    "brain": 2.727,
-    "body": 4.65,
-    "total": 7.38
+    "brain": 2.686,
+    "body": 4.59,
+    "total": 7.28
    },
    "video": "assets/embodied/DNa02_L.mp4",
    "note": "Steering DN alone, no locomotor DN active -> turning in place. Rayshubskiy et al. tested walking flies.",
@@ -767,7 +767,7 @@
      1.184,
      -1.184
     ],
-    "runtime_s": 4.76,
+    "runtime_s": 4.78,
     "control_every": 5
    },
    "brain_readouts": {
@@ -811,9 +811,9 @@
    "gt_id": "gt06_dna02R_activate_turn_right",
    "verdict": "consistent",
    "runtimes_s": {
-    "brain": 2.782,
-    "body": 4.76,
-    "total": 7.55
+    "brain": 2.673,
+    "body": 4.78,
+    "total": 7.46
    },
    "video": "assets/embodied/DNa02_R.mp4",
    "note": "Steering DN alone, no locomotor DN active -> turning in place. Rayshubskiy et al. tested walking flies.",
@@ -875,7 +875,7 @@
      0.0,
      0.0
     ],
-    "runtime_s": 4.44,
+    "runtime_s": 4.52,
     "control_every": 5
    },
    "brain_readouts": {
@@ -929,12 +929,12 @@
    "gt_id": "gt19_lplc2_activate_backward",
    "verdict": "inconsistent",
    "runtimes_s": {
-    "brain": 6.472,
-    "body": 4.44,
-    "total": 10.93
+    "brain": 6.275,
+    "body": 4.52,
+    "total": 10.8
    },
    "video": "assets/embodied/LPLC2_bilateral.mp4",
-   "note": "Natural upstream (visual looming) stimulus. In the brain model LPLC2 drives the giant fiber strongly but MDN stays at 0 Hz, so the body does not walk backward. Wu et al. 2016 report jumping and backward walking with about equal penetrance: the escape half is reproduced, the backward half is not. Unverified hypothesis: the backward component uses DNs other than MDN/P9/DNa01/DNa02 or pathways outside the brain connectome (VNC).",
+   "note": "Upstream visual stimulus: direct 150 Hz activation of the looming-sensitive LPLC2 neurons (analogous to the optogenetic activation of Wu et al. 2016, not a simulated looming stimulus). In the brain model LPLC2 drives the giant fiber strongly but MDN stays at 0 Hz, so the body does not walk backward. Wu et al. 2016 report jumping and backward walking with about equal penetrance: the escape half is reproduced, the backward half is not. Unverified hypothesis: the backward component uses DNs other than MDN/P9/DNa01/DNa02 or pathways outside the brain connectome (VNC).",
    "body_seed_robustness": {
     "phase_noise_rad": 0.5,
     "seeds": [
@@ -995,7 +995,7 @@
      0.0,
      0.0
     ],
-    "runtime_s": 4.36,
+    "runtime_s": 4.5,
     "control_every": 5
    },
    "brain_readouts": {
@@ -1042,9 +1042,9 @@
    "gt_id": "gt02_mdn_silence_backward",
    "verdict": "inconclusive",
    "runtimes_s": {
-    "brain": 5.883,
-    "body": 4.36,
-    "total": 10.25
+    "brain": 6.596,
+    "body": 4.5,
+    "total": 11.1
    },
    "video": "assets/embodied/LPLC2_MDN_silenced.mp4",
    "note": "Silencing control for MDN. Uninformative here: MDN was already at 0 Hz without silencing, so the check is reported as 'inconclusive' (raw verdict kept) and excluded from the hit rate.",
@@ -1106,7 +1106,7 @@
      0.0,
      0.0
     ],
-    "runtime_s": 4.56,
+    "runtime_s": 4.81,
     "control_every": 5
    },
    "brain_readouts": {
@@ -1150,9 +1150,9 @@
    "gt_id": "gt10_sugar_activate_feed",
    "verdict": "consistent",
    "runtimes_s": {
-    "brain": 4.061,
-    "body": 4.56,
-    "total": 8.63
+    "brain": 4.442,
+    "body": 4.81,
+    "total": 9.26
    },
    "video": "assets/embodied/sugar_GRN.mp4",
    "body_seed_robustness": {
@@ -1213,7 +1213,7 @@
      0.0,
      0.0
     ],
-    "runtime_s": 4.56,
+    "runtime_s": 4.7,
     "control_every": 5
    },
    "brain_readouts": {
@@ -1257,9 +1257,9 @@
    "gt_id": "gt14_jo_activate_groom",
    "verdict": "consistent",
    "runtimes_s": {
-    "brain": 4.76,
-    "body": 4.56,
-    "total": 9.33
+    "brain": 4.771,
+    "body": 4.7,
+    "total": 9.48
    },
    "video": "assets/embodied/JO_CE.mp4",
    "body_seed_robustness": {
@@ -1334,6 +1334,6 @@
    "gt10_sugar_activate_feed": "consistent",
    "gt14_jo_activate_groom": "consistent"
   },
-  "total_wall_s": 119.1
+  "total_wall_s": 121.0
  }
 }

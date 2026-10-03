@@ -6,9 +6,9 @@
   720575940632499757
  ],
  "candidates": "visual_projection",
- "created": "2026-10-04 00:41",
- "headline": "GF: among 326 candidate types (17 in-silico hits at >= 5 Hz), connectome-guided ranking finds the first hit after 1.0 experiments vs 18.2 expected for random order (18.17x; other >=2-hop score variants 18.17-18.17x; naive 'largest type first' order: 3.0) and all hits after 317.0 vs 308.8 (0.97x; other >=2-hop variants 1.02-1.1x); exhaustive = 326 experiments. With a budget of 20 experiments (6% of the screen) the guided order finds 14/17 hits vs 1.0 expected for random order. Second-seed replicate: 2/17 hits replicate; all robust hits found after 4.0 vs 218.0 random (54.5x).",
- "literature_headline": "Literature check: first literature-verified hit (LPLC2, LC4) after 2.0 guided experiments vs 109.0 expected random (54.5x; direct-synapse-only ranking: 1.0); in-silico recall of literature hits 2/2.",
+ "created": "2026-10-04 00:51",
+ "headline": "GF: among 326 candidate types (17 in-silico hits at >= 5 Hz), connectome-guided ranking finds the first hit after 1.0 experiments vs 18.2 expected for random order (18.17x; other >=2-hop score variants 18.17-18.17x; naive 'largest type first' order: 3.0) and all hits after 317.0 vs 308.8 (0.97x; other >=2-hop variants 1.02-1.1x); exhaustive = 326 experiments. With a budget of 20 experiments (6% of the screen) the guided order finds 14/17 hits vs 1.0 expected for random order. Second-seed replicate: 16/17 hits replicate; all robust hits found after 295.0 vs 307.8 random (1.04x).",
+ "literature_headline": "Literature check: the guided order reaches the first literature-known driver of GF (LPLC2, connectome rank 2; set: LPLC2, LC4) after 2.0 experiments vs 109.0 expected random (54.5x; direct-synapse-only ranking: 1.0); in-silico recall of literature hits 2/2.",
  "definitions": {
   "hit": "mean firing rate of the GF group >= 5 Hz when all neurons of the candidate type are driven with Poisson input at 150 Hz (2 trials x 500 ms). Model baseline is 0 Hz, so any firing is evoked. Threshold chosen by us before the full screen (not externally pre-registered); sensitivity in 'sensitivity_threshold', seed replicate in 'seed_robustness'.",
   "experiment": "one whole-brain LIF simulation (flylab.brain.simulate) activating one candidate cell type",
@@ -27,14 +27,14 @@
   "primary": "meanfield_3hop",
   "method": "meanfield",
   "max_hops": 3,
-  "matrix_build_s": 1.17,
+  "matrix_build_s": 1.1,
   "ranking_s": {
    "fraction_1hop": 0.007,
-   "fraction_2hop": 0.074,
-   "fraction_3hop": 0.858,
+   "fraction_2hop": 0.076,
+   "fraction_3hop": 0.897,
    "meanfield_1hop": 0.007,
    "meanfield_2hop": 0.075,
-   "meanfield_3hop": 0.258
+   "meanfield_3hop": 0.253
   },
   "ranking_note": "matrix_build_s is a one-time cost (sparse connectome matrices), included in the guided wall time; ranking all candidates afterwards takes ranking_s",
   "spearman_score_vs_rate": 0.3544892369125283
@@ -48,8 +48,8 @@
    "experiments_to_first_hit_deterministic": 1,
    "experiments_to_all_hits_deterministic": 317,
    "tie_note": "primary numbers are tie-aware expectations (candidates with equal score tested in random order); 'deterministic' breaks ties alphabetically",
-   "wall_s_to_first_hit": 3.12,
-   "wall_s_to_all_hits": 388.59,
+   "wall_s_to_first_hit": 3.05,
+   "wall_s_to_all_hits": 388.52,
    "average_precision": 0.8060296319427444,
    "recall_at": {
     "5": 0.29411764705882354,
@@ -1063,198 +1063,121 @@
   "note": "every candidate with target rate >= 2.5 Hz (seed 0) re-simulated with seed 1; candidates below that are assumed non-hits. robust hit = hit in both seeds.",
   "second_seed": 1,
   "n_rechecked": 22,
-  "rechecked_wall_s": 26.8,
+  "rechecked_wall_s": 32.9,
   "hits_seed_a": 17,
-  "hits_seed_b": 2,
-  "n_robust_hits": 2,
+  "hits_seed_b": 17,
+  "n_robust_hits": 16,
   "robust_hits": [
    "LPLC2",
-   "LC4"
+   "LC6",
+   "LC17",
+   "LC4",
+   "LC15",
+   "LC31a",
+   "LT1a",
+   "LCe04",
+   "LT1b",
+   "MTe35",
+   "LT83",
+   "LTe58",
+   "LC28c",
+   "aMe5",
+   "LTe54",
+   "LTe20"
   ],
   "unstable": [
    {
-    "cell_type": "LC15",
-    "rate_hz_seed0": 99.5,
-    "rate_hz_seed1": 0.0,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "LC17",
-    "rate_hz_seed0": 130.0,
-    "rate_hz_seed1": 3.5,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "LC28c",
-    "rate_hz_seed0": 13.0,
-    "rate_hz_seed1": 0.0,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "LC31a",
-    "rate_hz_seed0": 61.0,
-    "rate_hz_seed1": 0.0,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "LC6",
-    "rate_hz_seed0": 159.0,
-    "rate_hz_seed1": 0.0,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "LCe04",
-    "rate_hz_seed0": 49.0,
-    "rate_hz_seed1": 0.0,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "LT1a",
-    "rate_hz_seed0": 61.0,
-    "rate_hz_seed1": 0.0,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "LT1b",
-    "rate_hz_seed0": 24.0,
-    "rate_hz_seed1": 0.0,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
     "cell_type": "LT79",
     "rate_hz_seed0": 8.5,
-    "rate_hz_seed1": 0.0,
+    "rate_hz_seed1": 4.0,
     "hit_seed0": true,
     "hit_seed1": false
    },
    {
-    "cell_type": "LT83",
-    "rate_hz_seed0": 14.0,
-    "rate_hz_seed1": 0.0,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "LTe20",
-    "rate_hz_seed0": 7.0,
-    "rate_hz_seed1": 0.0,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "LTe54",
-    "rate_hz_seed0": 8.0,
-    "rate_hz_seed1": 0.0,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "LTe58",
-    "rate_hz_seed0": 14.0,
-    "rate_hz_seed1": 0.0,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "MTe35",
-    "rate_hz_seed0": 17.5,
-    "rate_hz_seed1": 0.0,
-    "hit_seed0": true,
-    "hit_seed1": false
-   },
-   {
-    "cell_type": "aMe5",
-    "rate_hz_seed0": 9.0,
-    "rate_hz_seed1": 0.0,
-    "hit_seed0": true,
-    "hit_seed1": false
+    "cell_type": "MTe27",
+    "rate_hz_seed0": 2.5,
+    "rate_hz_seed1": 5.5,
+    "hit_seed0": false,
+    "hit_seed1": true
    }
   ],
   "search_robust_hits": {
-   "n_hits": 2,
-   "guided_first": 2.0,
-   "guided_all": 4.0,
-   "random_first_expected": 109.0,
-   "random_all_expected": 218.0,
-   "reduction_first": 54.5,
-   "reduction_all": 54.5,
-   "average_precision": 0.5,
-   "recall_at_10": 1.0
+   "n_hits": 16,
+   "guided_first": 1.0,
+   "guided_all": 295.0,
+   "random_first_expected": 19.235294117647058,
+   "random_all_expected": 307.7647058823529,
+   "reduction_first": 19.24,
+   "reduction_all": 1.04,
+   "average_precision": 0.853054748923393,
+   "recall_at_10": 0.625
   },
   "variants_robust_hits": {
    "fraction_1hop": {
-    "n_hits": 2,
+    "n_hits": 16,
     "guided_first": 1.0,
-    "guided_all": 2.0,
-    "random_first_expected": 109.0,
-    "random_all_expected": 218.0,
-    "reduction_first": 109.0,
-    "reduction_all": 109.0,
-    "average_precision": 1.0,
-    "recall_at_10": 1.0
+    "guided_all": 303.07142857142856,
+    "random_first_expected": 19.235294117647058,
+    "random_all_expected": 307.7647058823529,
+    "reduction_first": 19.24,
+    "reduction_all": 1.02,
+    "average_precision": 0.26871883423286197,
+    "recall_at_10": 0.1875
    },
    "fraction_2hop": {
-    "n_hits": 2,
+    "n_hits": 16,
     "guided_first": 1.0,
-    "guided_all": 2.0,
-    "random_first_expected": 109.0,
-    "random_all_expected": 218.0,
-    "reduction_first": 109.0,
-    "reduction_all": 109.0,
-    "average_precision": 1.0,
-    "recall_at_10": 1.0
+    "guided_all": 297.0,
+    "random_first_expected": 19.235294117647058,
+    "random_all_expected": 307.7647058823529,
+    "reduction_first": 19.24,
+    "reduction_all": 1.04,
+    "average_precision": 0.5526498508074802,
+    "recall_at_10": 0.4375
    },
    "fraction_3hop": {
-    "n_hits": 2,
+    "n_hits": 16,
     "guided_first": 1.0,
-    "guided_all": 2.0,
-    "random_first_expected": 109.0,
-    "random_all_expected": 218.0,
-    "reduction_first": 109.0,
-    "reduction_all": 109.0,
-    "average_precision": 1.0,
-    "recall_at_10": 1.0
+    "guided_all": 281.0,
+    "random_first_expected": 19.235294117647058,
+    "random_all_expected": 307.7647058823529,
+    "reduction_first": 19.24,
+    "reduction_all": 1.1,
+    "average_precision": 0.6624779194772833,
+    "recall_at_10": 0.5
    },
    "meanfield_1hop": {
-    "n_hits": 2,
+    "n_hits": 16,
     "guided_first": 1.0,
-    "guided_all": 2.0,
-    "random_first_expected": 109.0,
-    "random_all_expected": 218.0,
-    "reduction_first": 109.0,
-    "reduction_all": 109.0,
-    "average_precision": 1.0,
-    "recall_at_10": 1.0
+    "guided_all": 303.07142857142856,
+    "random_first_expected": 19.235294117647058,
+    "random_all_expected": 307.7647058823529,
+    "reduction_first": 19.24,
+    "reduction_all": 1.02,
+    "average_precision": 0.26871883423286197,
+    "recall_at_10": 0.1875
    },
    "meanfield_2hop": {
-    "n_hits": 2,
+    "n_hits": 16,
     "guided_first": 1.0,
-    "guided_all": 3.0,
-    "random_first_expected": 109.0,
-    "random_all_expected": 218.0,
-    "reduction_first": 109.0,
-    "reduction_all": 72.67,
-    "average_precision": 0.8333333333333333,
-    "recall_at_10": 1.0
+    "guided_all": 303.0,
+    "random_first_expected": 19.235294117647058,
+    "random_all_expected": 307.7647058823529,
+    "reduction_first": 19.24,
+    "reduction_all": 1.02,
+    "average_precision": 0.635033992700969,
+    "recall_at_10": 0.5
    },
    "meanfield_3hop": {
-    "n_hits": 2,
-    "guided_first": 2.0,
-    "guided_all": 4.0,
-    "random_first_expected": 109.0,
-    "random_all_expected": 218.0,
-    "reduction_first": 54.5,
-    "reduction_all": 54.5,
-    "average_precision": 0.5,
-    "recall_at_10": 1.0
+    "n_hits": 16,
+    "guided_first": 1.0,
+    "guided_all": 295.0,
+    "random_first_expected": 19.235294117647058,
+    "random_all_expected": 307.7647058823529,
+    "reduction_first": 19.24,
+    "reduction_all": 1.04,
+    "average_precision": 0.853054748923393,
+    "recall_at_10": 0.625
    }
   }
  },
@@ -1302,8 +1225,8 @@
     "experiments_to_first_hit_deterministic": 2,
     "experiments_to_all_hits_deterministic": 4,
     "tie_note": "primary numbers are tie-aware expectations (candidates with equal score tested in random order); 'deterministic' breaks ties alphabetically",
-    "wall_s_to_first_hit": 5.43,
-    "wall_s_to_all_hits": 9.22,
+    "wall_s_to_first_hit": 5.35,
+    "wall_s_to_all_hits": 9.15,
     "average_precision": 0.5,
     "recall_at": {
      "5": 1.0,
@@ -2044,13 +1967,13 @@
   "note": "agent-generated hypotheses: in-silico hits not among the literature-known hits used here (incl. extra_sets) - may be known elsewhere, or model artefacts; untested",
   "cell_types": [
    "LC17",
-   "LT1a",
    "LC31a",
+   "LT1a",
    "LCe04",
    "LT1b",
    "MTe35",
-   "LT83",
    "LTe58",
+   "LT83",
    "LC28c",
    "aMe5",
    "LT79",
@@ -2059,13 +1982,13 @@
   ],
   "rates_hz": {
    "LC17": 130.0,
-   "LT1a": 61.0,
    "LC31a": 61.0,
+   "LT1a": 61.0,
    "LCe04": 49.0,
    "LT1b": 24.0,
    "MTe35": 17.5,
-   "LT83": 14.0,
    "LTe58": 14.0,
+   "LT83": 14.0,
    "LC28c": 13.0,
    "aMe5": 9.0,
    "LT79": 8.5,
@@ -2077,7 +2000,7 @@
   "wall_s_per_experiment_mean": 1.241,
   "wall_s_per_experiment_median": 1.145,
   "wall_s_exhaustive_screen": 404.5,
-  "wall_s_benchmark_total": 23.1,
+  "wall_s_benchmark_total": 1.4,
   "n_experiments_replayed_from_cache": 326,
   "cache_note": "per-experiment wall times are the measured simulation times (also for rows replayed from spikes/screen/out/screen_cache.jsonl); wall_s_benchmark_total is this run's own wall time and is small when the screen is replayed from the cache",
   "hardware_note": "shared 16-thread Windows laptop CPU, 2 threads per experiment, other jobs running"

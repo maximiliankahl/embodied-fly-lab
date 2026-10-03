@@ -100,9 +100,16 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             self.send_response(resp.status_code)
+            no_body = self.command == "HEAD" or resp.status_code in (204, 304) or resp.status_code < 200
             for k, v in resp.headers.multi_items():
-                if k.lower() not in HOP:
+                if k.lower() not in HOP or (no_body and k.lower() == "content-length"):
                     self.send_header(k, v)
+            if no_body:
+                # HEAD / 204 / 304 carry no body: a chunked terminator here would be read by the client as
+                # the next status line ("illegal status line: b'0'" in Omnigent's gateway shim).
+                self.end_headers()
+                self.wfile.flush()
+                return
             self.send_header("Transfer-Encoding", "chunked")
             self.end_headers()
             for chunk in resp.iter_raw():  # raw bytes: keeps content-encoding and SSE framing intact
