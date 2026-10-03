@@ -28,3 +28,7 @@ data/raw/
 data/cache/
 spikes/**/out/
 *.parquet
+# demo videos that are part of the submission (keep each < 3 MB)
+!assets/**/*.mp4
+runs/CURRENT
+.omnigent/
