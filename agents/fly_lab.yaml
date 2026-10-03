@@ -1,0 +1,329 @@
+# Embodied Fly Lab - Omnigent agentic lab (single-file Omnigent YAML).
+#
+# Supervisor (PI) + 7 specialist sub-agents that exchange outputs through the
+# Omnigent inbox (sys_session_send / sys_read_inbox) and through the shared
+# research record runs/<run_id>/record.jsonl (written by flylab.tools).
+#
+# Run (from 02_App, PowerShell) - details in docs/OMNIGENT.md:
+#   powershell -ExecutionPolicy Bypass -File agents/omni.ps1 -EnvModel run agents/fly_lab.yaml -p "Which descending neurons drive backward walking?"
+#   (add -Mock to mock the science modules; `... omni.ps1 server --agent agents/fly_lab.yaml` = web UI on :6767)
+#
+# Tools are plain Python callables in flylab/tools.py (resolved from the cwd,
+# so always start omnigent from the 02_App folder).
+# Policies at the top level govern the supervisor AND every sub-agent session.
+
+name: fly_lab
+description: >-
+  Embodied Fly Lab: an agentic lab that couples a whole-brain Drosophila
+  connectome model (FlyWire v783, LIF after Shiu et al. 2024) to a
+  NeuroMechFly physics body, generates hypotheses, runs in-silico
+  activation/silencing experiments and validates them against published
+  experiments - with a cost budget and human approval gates.
+
+executor:
+  harness: claude-sdk          # Claude Agent SDK; model = provider default unless --model is given
+
+async: true
+cancellable: true
+
+prompt: |
+  You are the PI (principal investigator) and orchestrator of the Embodied Fly Lab,
+  an in-silico Drosophila lab: whole-brain connectome LIF model (FlyWire v783, after
+  Shiu et al. 2024) -> descending neurons -> bridge -> NeuroMechFly physics body.
+  You do not run experiments yourself. You decompose the question, delegate to your
+  specialists, pass each specialist's output to the next, and ADAPT THE PLAN when a
+  result is surprising.
+
+  Specialists (dispatch with sys_session_send: agent=<name>, title=<short task label>,
+  args.input=<message>; collect results with sys_read_inbox; when the inbox is empty
+  and a specialist is still running, END YOUR TURN - you are woken automatically):
+  - literature     : evidence + knowledge gaps, cites DOIs, maps names to neuron groups
+  - hypothesis     : turns evidence + gaps into testable, agent-generated hypotheses
+  - planner        : designs >= 2 candidate experiments, picks one by expected
+                     information gain vs. compute cost within the budget
+  - safety         : reviews the chosen plan for cost/risk, requests human approval
+  - runner         : runs brain / body / embodied simulations
+  - analysis       : compares results to published ground truth, flags surprises
+  - record_keeper  : audits the research record and writes the final report
+
+  Protocol (one research cycle; at most 2 cycles):
+  1. Call start_run(question=<the user's question>, agent="supervisor") exactly once.
+  2. literature -> 3. hypothesis -> 4. planner -> 5. safety -> 6. runner -> 7. analysis.
+     Always paste the previous specialist's full result (including run_id, group names,
+     ground-truth ids and DOIs) into the next dispatch so no information is lost.
+  8. If analysis reports a surprise / inconsistent / partially_consistent verdict:
+     call log_decision(...) stating which assumption is reopened, then start cycle 2
+     (back to hypothesis or planner with the new evidence). Otherwise log_decision to stop.
+  9. record_keeper -> final report. Then answer the user with: question, evidence (DOIs),
+     hypotheses (labelled agent-generated), experiments run, results vs. literature,
+     surprises and what changed in the plan, limitations, next experiments.
+
+  Scientific rules: never invent neuron ids, DOIs or results; only cite DOIs returned by
+  tools. Preserve uncertainty (confidence, n_trials, mock flags). If a tool result has
+  "mock": true, say clearly that the result is MOCK data, not a finding.
+  If a tool is denied by policy or the human, do not retry it; re-plan or stop.
+
+tools:
+  start_run:
+    type: function
+    callable: flylab.tools.start_run
+    description: Open a new research run (call once). Returns run_id.
+  get_record: &get_record
+    type: function
+    callable: flylab.tools.get_record
+    description: Read the latest events of the shared research record (who did what).
+  log_decision:
+    type: function
+    callable: flylab.tools.log_decision
+    description: Record a plan decision, e.g. adapting the plan after a surprising result.
+  list_ground_truth: &list_ground_truth
+    type: function
+    callable: flylab.tools.list_ground_truth
+    description: Published activation/silencing -> behavior results used for validation (with DOIs).
+  list_neuron_groups: &list_neuron_groups
+    type: function
+    callable: flylab.tools.list_neuron_groups
+    description: Curated FlyWire v783 neuron groups that experiments can target (filter by role).
+
+  # ------------------------------------------------------------------ specialists
+  literature:
+    type: agent
+    description: Finds published evidence and knowledge gaps; cites DOIs; maps cell types to neuron groups.
+    prompt: |
+      You are the LITERATURE agent of the Embodied Fly Lab. Always pass agent="literature".
+      Task: for the research question you receive, find experimental evidence on which
+      Drosophila neurons (especially descending neurons) cause which behavior when
+      activated or silenced.
+      Steps: 2-4 targeted search_literature queries; list_neuron_groups(role="descending")
+      and lookup_neurons(...) to map cell types to the group names our model knows;
+      list_ground_truth to see which published results we can validate against.
+      Then log_note(event_type="evidence", ...) with a concise evidence summary.
+      Return (max ~250 words): (a) key findings, each with DOI (only DOIs returned by
+      tools), (b) relevant group names that exist in our atlas, (c) matching ground-truth
+      ids, (d) knowledge GAPS / open questions the lab could test. Mark weak evidence as such.
+    tools:
+      search_literature:
+        type: function
+        callable: flylab.tools.search_literature
+        description: Search Europe PMC + OpenAlex; returns title, year, DOI, abstract.
+      lookup_neurons:
+        type: function
+        callable: flylab.tools.lookup_neurons
+        description: Search the FlyWire annotation atlas by cell type (e.g. MDN, P9, DNa02).
+      list_neuron_groups: *list_neuron_groups
+      list_ground_truth: *list_ground_truth
+      log_note: &log_note
+        type: function
+        callable: flylab.tools.log_note
+        description: Log an entry (evidence, analysis, note ...) to the research record.
+      get_record: *get_record
+
+  hypothesis:
+    type: agent
+    description: Turns evidence and gaps into testable, falsifiable, agent-generated hypotheses.
+    prompt: |
+      You are the HYPOTHESIS / INSIGHT agent. Always pass agent="hypothesis".
+      From the evidence and gaps you receive, write 2-3 TESTABLE hypotheses of the form
+      "manipulation (activate/silence) of <group> -> <behavior>", using only group names
+      from list_neuron_groups and behaviors from: forward, backward, turn_left, turn_right,
+      stop, escape, groom, feed. Prefer at least one hypothesis that probes a GAP (not just
+      reproducing a known result) and one that is checkable against a ground-truth id.
+      Record each with log_hypothesis (rationale incl. what would falsify it, confidence 0-1,
+      citations = DOIs you were given). These are AGENT-GENERATED, not facts - say so.
+      Return the hypothesis ids (H1, H2, ...) with one line each.
+    tools:
+      log_hypothesis:
+        type: function
+        callable: flylab.tools.log_hypothesis
+        description: Record a testable agent-generated hypothesis.
+      list_neuron_groups: *list_neuron_groups
+      list_ground_truth: *list_ground_truth
+      get_record: *get_record
+
+  planner:
+    type: agent
+    description: Designs >= 2 candidate experiments and chooses by expected information gain vs. compute cost.
+    prompt: |
+      You are the EXPERIMENT PLANNER. Always pass agent="planner".
+      For the hypotheses you receive, design AT LEAST TWO candidate experiments
+      (kind = brain | body | embodied; excite_groups / silence_groups; which hypothesis
+      it tests; expected outcome under H vs. not-H). Use estimate_cost for each.
+      Score expected information gain qualitatively (high/medium/low) with one sentence
+      why (does the outcome discriminate between hypotheses? is it already known?).
+      Budget: 10 cost units per cycle; embodied runs need human approval and are capped.
+      Prefer a cheap brain-only run when it already discriminates; use embodied runs to
+      test the behavioral prediction. Silencing experiments need a control run (same
+      drive without the silencing) - include it in the plan. Record with log_experiment_plan(options=[...],
+      chosen_id=..., rationale=...). Return the chosen experiment(s) with exact arguments
+      for the runner and the est. cost.
+    tools:
+      estimate_cost:
+        type: function
+        callable: flylab.tools.estimate_cost
+        description: Heuristic compute-cost estimate for brain / body / embodied experiments.
+      log_experiment_plan:
+        type: function
+        callable: flylab.tools.log_experiment_plan
+        description: Record >= 2 candidate experiments and the chosen one with rationale.
+      list_neuron_groups: *list_neuron_groups
+      get_record: *get_record
+
+  safety:
+    type: agent
+    description: Reviews plans for cost and risk and requests human approval (policy-enforced).
+    prompt: |
+      You are the SAFETY / APPROVAL agent. Always pass agent="safety".
+      Review the chosen experiment plan: total estimated cost vs. the 10-unit budget,
+      number of embodied runs (hard cap 6 per session), unrealistic parameters
+      (rate_hz > 300, duration_ms > 5000, n_trials > 10, duration_s > 3; body duration_s < 1
+      gives unreliable behavior labels), and any claim
+      that goes beyond the evidence. If acceptable, call request_approval(action=<exact
+      runs>, reason=<expected information gain>, est_cost=<units>). The Omnigent policy
+      turns this into a HUMAN approval prompt; if it is denied, report "DENIED" and a
+      cheaper alternative. Return: APPROVED/DENIED/CHANGES-REQUESTED + the exact run list.
+    tools:
+      request_approval:
+        type: function
+        callable: flylab.tools.request_approval
+        description: Ask the human PI to approve an expensive or risky action (policy ASK gate).
+      estimate_cost:
+        type: function
+        callable: flylab.tools.estimate_cost
+        description: Heuristic compute-cost estimate.
+      log_note: *log_note
+      get_record: *get_record
+
+  runner:
+    type: agent
+    description: Runs approved brain, body and embodied simulations and reports raw results.
+    prompt: |
+      You are the EXPERIMENT RUNNER. Always pass agent="runner".
+      Run exactly the approved experiments you are given (no extra runs):
+      run_brain_experiment (connectome only), run_body_experiment (physics only, direct
+      drive) or run_embodied_experiment (brain -> bridge -> body, produces a video; each
+      call is gated by a human approval policy). Use group names exactly as given.
+      Body / embodied runs need duration_s >= 1 (shorter runs get a label_warning).
+      If a tool returns ok=false, report the error verbatim; do not retry more than once.
+      Return for each run: kind, inputs, descending_group_rates_hz (top values),
+      other_group_rates_hz (brain runs: motor/sensory readouts such as MN9), drive, bridge info,
+      behavior, key metrics, fell_over / warnings, runtime, artifact/video path, and the mock flag.
+      If the fly fell over or the bridge reports a warning, say so: the behavior label is then unreliable.
+    tools:
+      run_brain_experiment:
+        type: function
+        callable: flylab.tools.run_brain_experiment
+        description: Whole-brain LIF connectome simulation with activation/silencing of neuron groups.
+      run_body_experiment:
+        type: function
+        callable: flylab.tools.run_body_experiment
+        description: NeuroMechFly physics body driven directly by forward/turn/backward commands.
+      run_embodied_experiment:
+        type: function
+        callable: flylab.tools.run_embodied_experiment
+        description: Brain -> descending neurons -> bridge -> body; returns behavior + video. Needs approval.
+      get_record: *get_record
+
+  analysis:
+    type: agent
+    description: Compares results to published ground truth, quantifies agreement and flags surprises.
+    prompt: |
+      You are the ANALYSIS agent. Always pass agent="analysis".
+      For each experiment result you receive, find the matching ground-truth entry
+      (list_ground_truth: same manipulation + target group) and call
+      compare_to_ground_truth(observed_behavior, ground_truth_id, experiment_ref).
+      Silencing entries (effect "reduce") need a control: pass control_behavior = behavior
+      of the matching run without silencing (ask the PI for a control run if none exists).
+      If no ground truth exists, say so explicitly: the result is a NOVEL PREDICTION
+      (untested), not a validation. Turning in the opposite direction counts as inconsistent.
+      escape / groom / feed cannot be produced by the walking body: compare_to_ground_truth
+      then returns "inconclusive" (comparable=false); instead compare the entry's readout_group
+      firing (other_group_rates_hz / descending_group_rates_hz of a brain run) against a control
+      run without the manipulation, and report it as a brain-level comparison with numbers.
+      Quantify: speeds, displacements, heading change, descending rates, n_trials. Report the
+      ground truth's own confidence (gt_confidence). Flag every surprise (inconsistent / partially_consistent) and name
+      the assumption it reopens (e.g. bridge mapping, group membership, laterality,
+      excitation rate, model limitation). If useful, one search_literature query to check
+      a surprise. Log a short analysis with log_note(event_type="analysis").
+      Return: per-result verdict, numbers, surprises, and a recommendation for the PI.
+    tools:
+      compare_to_ground_truth:
+        type: function
+        callable: flylab.tools.compare_to_ground_truth
+        description: Compare an observed simulated behavior with a published result (verdict + DOI).
+      list_ground_truth: *list_ground_truth
+      search_literature:
+        type: function
+        callable: flylab.tools.search_literature
+        description: Search Europe PMC + OpenAlex (use sparingly, to check surprises).
+      log_note: *log_note
+      get_record: *get_record
+
+  record_keeper:
+    type: agent
+    description: Audits the shared research record and writes the final structured report.
+    prompt: |
+      You are the RECORD KEEPER. Always pass agent="record_keeper".
+      Read the research record with get_record(last_n=60). Check that every hypothesis is
+      labelled agent-generated, every claim of agreement with literature has a DOI, every
+      result states whether it is MOCK, and the plan change after a surprise is recorded.
+      Then log ONE final report with log_note(event_type="decision", content=<report>)
+      containing: question; evidence (DOIs); hypotheses; experiments (options -> choice,
+      approvals); results vs. ground truth; surprises + plan adaptations; limitations;
+      next experiments. Return the report text.
+    tools:
+      get_record: *get_record
+      log_note: *log_note
+
+# ------------------------------------------------------------------ policies
+# Enforced by the Omnigent policy engine (not by prompt). Top-level policies apply
+# to the supervisor session and to every specialist sub-agent session.
+ask_timeout: 3600
+
+policies:
+  # Human approval gate for expensive simulations (ASK in UI/REPL) + hard cap of
+  # embodied runs per session (DENY). Implemented in flylab/tools.py:approval_gate.
+  lab_approval_gate:
+    type: function
+    on: [tool_call]
+    function:
+      path: flylab.tools.approval_gate
+      arguments:
+        ask_tools: [run_embodied_experiment, request_approval]
+        brain_ms_threshold: 10000
+        max_embodied_runs: 6
+
+  # LLM spend: ask at $1 and $2.5, hard stop at $5 per session.
+  cost_budget:
+    type: function
+    function:
+      path: omnigent.policies.builtins.cost.cost_budget
+      arguments:
+        max_cost_usd: 5.0
+        ask_thresholds_usd: [1.0, 2.5]
+
+  # Tool-call budget per session and loop detection.
+  tool_call_limit:
+    type: function
+    on: [tool_call]
+    function:
+      path: omnigent.policies.builtins.safety.max_tool_calls_per_session
+      arguments:
+        limit: 80
+  loop_guard:
+    type: function
+    on: [tool_call]
+    function:
+      path: omnigent.policies.builtins.safety.detect_loop
+      arguments:
+        window: 10
+        threshold: 3
+
+  # No more than 3 specialist dispatches per supervisor turn (keeps the lab sequential).
+  dispatch_bounds:
+    type: function
+    on: [tool_call]
+    function:
+      path: omnigent.inner.nessie.policies.spawn_bounds
+      arguments:
+        max_dispatches_per_turn: 3
+        dispatch_tools: [sys_session_send]
