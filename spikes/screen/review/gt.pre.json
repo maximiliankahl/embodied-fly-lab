@@ -12,7 +12,7 @@
    "feed"
   ],
   "effect": "'induce' = manipulation evokes/increases the behaviour; 'reduce' = manipulation abolishes/decreases it. For 'reduce' entries, observing expected_behavior is INCONSISTENT with the paper - use atlas.evaluate().",
-  "built": "2026-10-04 00:40"
+  "built": "2026-10-04 00:19"
  },
  "entries": [
   {
@@ -559,7 +559,7 @@
    "confidence": "medium",
    "evidence_fulltext": "five different cell types (LC4, LC6, LC15, LPLC1 and LPLC2) drove highly penetrant jumping in at least one of the two assays",
    "readout_group": "GF",
-   "note": "Jumping = escape takeoff; Wu et al. did not test whether the jumps are GF-mediated (full text: 'LC4 neurons ... might evoke a jumping response via activation of the Giant Fiber (GF) cells'). Supporting GF link: Ache et al. 2019 (doi:10.1016/j.cub.2019.01.079) abstract: 'show that LPLC2 and LC4 synapse directly onto the GF' (anatomy, EM); von Reyn et al. 2017 (Neuron, doi:10.1016/j.neuron.2017.05.036) abstract: 'we identify a visual projection neuron type that conveys predator approach information to the Drosophila giant fiber (GF) escape circuit'. GF readout is our suggestion."
+   "note": "Jumping = escape takeoff; Wu et al. did not test whether the jumps are GF-mediated. Supporting GF link: von Reyn et al. 2017 (Neuron, doi:10.1016/j.neuron.2017.05.036) abstract: 'we identify a visual projection neuron type that conveys predator approach information to the Drosophila giant fiber (GF) escape circuit' - that this type is LC4 is stated in the paper body (not open access, not verified verbatim here). GF readout is our suggestion."
   },
   {
    "id": "gt23_lc6_activate_escape",

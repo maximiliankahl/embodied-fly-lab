@@ -361,6 +361,23 @@ _GROUP_SPECS: list[dict] = [
          description="LPLC2 lobula plate/lobula columnar neurons; looming detectors upstream of the giant fiber.",
          citations=["10.1016/j.cub.2019.01.079", "10.7554/eLife.21022"],
          confidence=("high", "FlyWire cell_type and hemibrain_type both 'LPLC2' (super_class visual_projection).")),
+    dict(name="LC16", sel={"cell_type": "LC16"}, role="sensory", function="looming-responsive visual projection neurons (backward walking)",
+         description="Lobula columnar 16 visual projection neurons; respond to looming, bilateral activation evokes backward walking "
+                     "(Wu et al. 2016), proposed to act via MDN (Sen et al. 2017).",
+         citations=["10.7554/eLife.21022", "10.1016/j.cub.2017.02.008"],
+         confidence=("high", "FlyWire cell_type and hemibrain_type both 'LC16' (super_class visual_projection, 151 neurons).")),
+    dict(name="LC4", sel={"cell_type": "LC4"}, role="sensory", function="looming-responsive visual projection neurons (escape / GF input)",
+         description="Lobula columnar 4 visual projection neurons; activation evokes jumping (Wu et al. 2016); "
+                     "a visual projection input to the giant fiber escape circuit (von Reyn et al. 2017).",
+         citations=["10.7554/eLife.21022", "10.1016/j.neuron.2017.05.036", "10.1016/j.cub.2019.01.079"],
+         confidence=("high", "FlyWire cell_type and hemibrain_type both 'LC4' (super_class visual_projection, 104 neurons). "
+                     "LC4 -> GF: Ache et al. 2019 abstract (verbatim) 'show that LPLC2 and LC4 synapse directly onto the GF' and "
+                     "attributes looming-velocity input to LC4 (their earlier work, von Reyn et al. 2017, whose abstract only says "
+                     "'a visual projection neuron type').")),
+    dict(name="LC6", sel={"cell_type": "LC6"}, role="sensory", function="looming-responsive visual projection neurons (jumping)",
+         description="Lobula columnar 6 visual projection neurons; respond to looming, activation evokes highly penetrant jumping (Wu et al. 2016).",
+         citations=["10.7554/eLife.21022"],
+         confidence=("high", "FlyWire cell_type and hemibrain_type both 'LC6' (super_class visual_projection, 125 neurons).")),
     # ---- interneurons / motor
     dict(name="aBN1", sel={"cell_type": "SAD093"}, role="interneuron", function="antennal grooming command interneuron",
          description="aBN1 antennal grooming brain interneuron (FlyWire SAD093; one per hemisphere).",
@@ -376,7 +393,7 @@ _GROUP_SPECS: list[dict] = [
 
 # Groups that are split into _L / _R in addition to the bilateral group.
 _SPLIT_SIDES = {"MDN", "P9", "DNa01", "DNa02", "GF", "DNg11", "DNg07", "sugar_GRN", "bitter_GRN", "water_GRN",
-                "JO_CE", "LPLC2", "aBN1", "MN9"}
+                "JO_CE", "LPLC2", "LC16", "LC4", "LC6", "aBN1", "MN9"}
 
 
 def _shiu_lists() -> dict[str, list[int]]:
@@ -589,6 +606,42 @@ _GT_SPECS: list[dict] = [
          evidence="command-like neurons that are sufficient to drive behaviours",
          evidence_fulltext="(iii) walk backward upon MDN stimulation for stimuli ≥ 10.5 μ W",
          confidence="high"),
+    # ---- visual projection neurons (added for the discovery screen, flylab/screen.py)
+    dict(id="gt20_lc16_activate_backward", manipulation="activate", target_group="LC16", expected_behavior="backward", effect="induce",
+         doi="10.7554/eLife.21022",
+         evidence="The activation phenotypes of two LC types closely resemble natural avoidance behaviors triggered by a visual loom",
+         evidence_fulltext="this variability does not change our conclusion that LC16 activation results in a strong backward walking response",
+         confidence="high",
+         readout_group="MDN",
+         note="Full text (Europe PMC PMC5293491): bilateral activation; 'Unilateral LC16 activation produced far less backward walking than "
+              "bilateral activation' and instead turning. The MDN readout is supported by Sen et al. 2017 (gt21)."),
+    dict(id="gt21_lc16_activate_backward_via_mdn", manipulation="activate", target_group="LC16", expected_behavior="backward", effect="induce",
+         doi="10.1016/j.cub.2017.02.008",
+         evidence="LC16 and MDNs are critical components of the neural circuit that transduces threatening visual stimuli into directional locomotor output",
+         confidence="high",
+         readout_group="MDN",
+         note="Abstract: 'we hypothesized that LC16 neurons induce backward walking via MDNs' and reports 'functional imaging, behavioral "
+              "epistasis, and unilateral activation experiments that support these hypotheses'. Mechanistic prediction for the brain model: "
+              "LC16 activation should drive MDN firing."),
+    dict(id="gt22_lc4_activate_escape", manipulation="activate", target_group="LC4", expected_behavior="escape", effect="induce",
+         doi="10.7554/eLife.21022",
+         evidence="for several types, optogenetic activation in freely moving flies evokes specific behaviors",
+         evidence_fulltext="five different cell types (LC4, LC6, LC15, LPLC1 and LPLC2) drove highly penetrant jumping in at least one of the two assays",
+         confidence="medium",
+         readout_group="GF",
+         note="Jumping = escape takeoff; Wu et al. did not test whether the jumps are GF-mediated (full text: 'LC4 neurons ... might "
+              "evoke a jumping response via activation of the Giant Fiber (GF) cells'). Supporting GF link: Ache et al. 2019 "
+              "(doi:10.1016/j.cub.2019.01.079) abstract: 'show that LPLC2 and LC4 synapse directly onto the GF' (anatomy, EM); "
+              "von Reyn et al. 2017 (Neuron, doi:10.1016/j.neuron.2017.05.036) abstract: 'we identify a visual projection neuron type "
+              "that conveys predator approach information to the Drosophila giant fiber (GF) escape circuit'. GF readout is our suggestion."),
+    dict(id="gt23_lc6_activate_escape", manipulation="activate", target_group="LC6", expected_behavior="escape", effect="induce",
+         doi="10.7554/eLife.21022",
+         evidence="The activation phenotypes of two LC types closely resemble natural avoidance behaviors triggered by a visual loom",
+         evidence_fulltext="three LC neuron driver lines that produced robust and highly penetrant activation phenotypes in both assays: LC6 (jumping)",
+         confidence="high",
+         readout_group="GF",
+         note="The two loom-like LC types of the abstract are LC6 (jumping) and LC16 (backward walking) per the full text. GF readout is our "
+              "suggestion; Wu et al. did not test GF dependence."),
 ]
 
 

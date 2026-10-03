@@ -11,7 +11,7 @@ body, bridge). Every tool:
 Mock mode (for testing the agent pipeline before the science modules exist):
   FLYLAB_MOCK=1            -> every component is mocked
   FLYLAB_MOCK=brain,body   -> only the listed components (atlas, literature,
-                              brain, body, bridge) are mocked
+                              brain, body, bridge, screen) are mocked
 Mock outputs always carry ``"mock": true`` and a ``"MOCK"`` notice. They are
 NOT scientific results. Without mock mode a missing module returns an
 ``error`` (never a silent fallback to fake data).
@@ -34,7 +34,7 @@ from typing import Any
 from flylab import record
 
 MOCK_NOTICE = "MOCK DATA (FLYLAB_MOCK) - plausible placeholder, NOT a simulation or literature result."
-_COMPONENTS = ("atlas", "literature", "brain", "body", "bridge")
+_COMPONENTS = ("atlas", "literature", "brain", "body", "bridge", "screen")
 BEHAVIORS = ("forward", "backward", "turn_left", "turn_right", "stop", "escape", "groom", "feed")
 BODY_BEHAVIORS = ("forward", "backward", "turn_left", "turn_right", "stop")  # what flylab.body can classify
 TURNS = {"turn_left", "turn_right"}
@@ -65,6 +65,33 @@ def _mock(component: str) -> bool:
     if raw in ("1", "true", "yes", "on", "all"):
         return True
     return component in {p.strip() for p in raw.split(",")}
+
+
+PREAPPROVE_FLAG_FILE = record.ROOT / "data" / "cache" / "FLYLAB_PREAPPROVE"  # gitignored; agents/omni.ps1 -ApproveAtLaunch
+
+
+def _preapproval() -> dict | None:
+    """Human pre-approval for a SCRIPTED (headless) run, or None.
+
+    Headless ``omnigent run -p`` declines every ASK (no human can answer), so for a scripted demo
+    Max pre-approves the lab's gated actions AT LAUNCH with ``agents/omni.ps1 -ApproveAtLaunch``, which
+    writes this flag file (deleted again when the command ends). approval_gate then ALLOWs what it
+    would otherwise ASK (hard caps still DENY), and every approval event in the research record says
+    "pre-approved at launch" instead of "approved in the UI". Env FLYLAB_PREAPPROVE=1 works too
+    (only in-process; the Omnigent runner does not inherit it)."""
+    raw = os.environ.get("FLYLAB_PREAPPROVE", "").strip()
+    try:
+        if not raw and PREAPPROVE_FLAG_FILE.exists():
+            raw = PREAPPROVE_FLAG_FILE.read_text(encoding="utf-8").strip() or "1"
+    except OSError:
+        return None
+    if raw.lower() in ("", "0", "false", "no", "off"):
+        return None
+    try:
+        info = json.loads(raw)
+        return info if isinstance(info, dict) else {"by": "human at launch"}
+    except json.JSONDecodeError:
+        return {"by": "human at launch (FLYLAB_PREAPPROVE)"}
 
 
 def _rid(run_id: str = "") -> str:
@@ -236,6 +263,12 @@ def _resolve_groups(names: list[str]) -> tuple[list[int], dict[str, int], list[s
                 except Exception:
                     match = []
             gids = [int(x) for x in groups[match[0]].get("root_ids", [])] if match and match[0] in groups else []
+            if not gids and not _mock("atlas") and not _mock("screen"):
+                try:  # any FlyWire v783 cell type, e.g. a screen hit such as "LC16" or "LPLC2"
+                    from flylab import screen
+                    gids = [int(x) for x in screen._resolve_ids(n)]
+                except Exception:
+                    gids = []
         if not gids:
             unknown.append(n)
         ids.extend(gids)
@@ -527,12 +560,15 @@ def log_hypothesis(statement: str, manipulation: str, target_groups: list, predi
     return {"ok": True, "run_id": rid, "hypothesis_id": hid, **data}
 
 
-def estimate_cost(kind: str, duration_ms: float = 1000.0, n_trials: int = 3, duration_s: float = 1.0) -> dict:
+def estimate_cost(kind: str, duration_ms: float = 1000.0, n_trials: int = 3, duration_s: float = 1.0,
+                  n_candidates: int = 1) -> dict:
     """Rough compute-cost estimate for an experiment, used by the planner to trade off information vs cost.
-    :param kind: "brain", "body" or "embodied".
-    :param duration_ms: Simulated brain time per trial (ms).
-    :param n_trials: Brain trials.
+    :param kind: "brain", "body", "embodied", "screen" (run_brain_screen over n_candidates cell types) or
+        "rank" (rank_candidates, connectome only).
+    :param duration_ms: Simulated brain time per trial (ms) (screen default in run_brain_screen: 500).
+    :param n_trials: Brain trials (screen default: 2).
     :param duration_s: Simulated body time (s).
+    :param n_candidates: Number of candidate cell types for kind="screen" (e.g. 326 = all visual projection types).
     :returns: {"est_wall_s", "cost_units", "needs_approval"} - heuristic, NOT measured; refine with runtime_s
         returned by real runs.
     """
@@ -540,15 +576,22 @@ def estimate_cost(kind: str, duration_ms: float = 1000.0, n_trials: int = 3, dur
     # brain: spikes/brain/out/validation.json, 10 trials x 1000 ms took 6-61 s wall (depends on how much of
     #        the brain becomes active) -> ~3 s per simulated second per trial + ~5 s connectome load/setup.
     # body:  flylab/body.py notes "1 sim-s costs ~7-25 s wall" -> 25 s/sim-s (conservative, incl. video).
+    # screen: flylab.screen.brain_screen with 4 threads, ~1 s wall per trial-second + ~1 s setup per candidate,
+    #         + ~10 s one-off connectome load (Phase 1 note: ~1 s wall per trial-second); rank: ~15 s incl. load.
     brain_s = 5.0 + 3.0 * duration_ms / 1000.0 * n_trials
     body_s = 25.0 * duration_s
+    n_c = max(1, int(n_candidates))
+    screen_s = 10.0 + n_c * (1.0 + 1.5 * duration_ms / 1000.0 * n_trials)
     k = kind.strip().lower()
-    est = {"brain": brain_s, "body": body_s, "embodied": brain_s + body_s}.get(k)
+    est = {"brain": brain_s, "body": body_s, "embodied": brain_s + body_s, "screen": screen_s, "rank": 15.0}.get(k)
     if est is None:
-        return {"ok": False, "error": f"unknown kind {kind!r}; use brain, body or embodied"}
+        return {"ok": False, "error": f"unknown kind {kind!r}; use brain, body, embodied, screen or rank"}
     units = round(est / 10.0, 2)
     return {"ok": True, "kind": k, "est_wall_s": round(est, 1), "cost_units": units,
-            "needs_approval": k == "embodied" or (k == "brain" and duration_ms * n_trials > 10000),
+            "n_candidates": n_c if k == "screen" else None,
+            "needs_approval": k == "embodied" or (k == "brain" and duration_ms * n_trials > 10000)
+                              or (k == "screen" and n_c * duration_ms * n_trials > 10000),
+            "denied_by_policy": k == "screen" and n_c > 40,
             "basis": "heuristic, calibrated on this laptop (brain validation runs, body.py notes); "
                      "compare with runtime_s from real runs"}
 
@@ -611,11 +654,20 @@ def request_approval(action: str, reason: str, est_cost: float = 0.0, agent: str
     rid = _rid(run_id)
     # This body only executes after the Omnigent ASK gate was approved (a denial blocks the call).
     # Called outside Omnigent (selftest, scripts) there is no human gate - the record says so.
-    data = {"action": action, "reason": reason, "est_cost_units": est_cost, "status": "approved",
-            "gate": "omnigent policy lab_approval_gate (ASK): this entry is only written after a human approved "
-                    "in the Omnigent UI/REPL; outside Omnigent no human gate exists"}
-    ev = record.log_event(rid, agent, "approval", f"Approved via approval gate: {action}", data)
-    return {"ok": True, "approved": True, "run_id": rid, "seq": ev["seq"]}
+    pre = _preapproval()
+    if pre:
+        status = "pre-approved"
+        gate = (f"omnigent policy lab_approval_gate: PRE-APPROVED by {pre.get('by', 'human at launch')} for this "
+                f"scripted run (agents/omni.ps1 -ApproveAtLaunch; caps still enforced: {pre.get('caps', 'see policy')})")
+        content = f"Pre-approved at launch (scripted run): {action}"
+    else:
+        status = "approved"
+        gate = ("omnigent policy lab_approval_gate (ASK): this entry is only written after a human approved "
+                "in the Omnigent UI/REPL; outside Omnigent no human gate exists")
+        content = f"Approved via approval gate: {action}"
+    data = {"action": action, "reason": reason, "est_cost_units": est_cost, "status": status, "gate": gate}
+    ev = record.log_event(rid, agent, "approval", content, data)
+    return {"ok": True, "approved": True, "status": status, "run_id": rid, "seq": ev["seq"]}
 
 
 # =========================================================================== experiment tools
@@ -839,6 +891,176 @@ def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experi
         return _err("compare_to_ground_truth", exc, rid, agent)
 
 
+# =========================================================================== discovery-engine tools (flylab.screen)
+# flylab.screen (Phase 2 contract) does connectome-guided ranking + a fast in-silico brain screen. It is
+# imported lazily; with FLYLAB_MOCK=screen (or =1) the tools return clearly labelled MOCK rows, and in
+# real mode a missing/broken module returns ok=false (never silent fake data).
+
+SCREEN_HIT_HZ = 5.0  # same pre-registered hit threshold as flylab.screen.benchmark_search
+_MOCK_SCREEN_TYPES = ["MOCK_LC16", "MOCK_LPLC2", "MOCK_LC4", "MOCK_LC9", "MOCK_LPC1", "MOCK_LT86"]
+
+
+def _screen_known_hits(target_group: str) -> dict:
+    try:
+        from flylab import screen
+        return {k: v.get("gt", []) for k, v in screen.KNOWN_HITS.get(target_group, {}).items()}
+    except Exception:
+        return {}
+
+
+def rank_candidates(target_group: str, candidate_kind: str = "visual_projection", top_k: int = 10,
+                    max_hops: int = 2, agent: str = "hypothesis", run_id: str = "") -> dict:
+    """Connectome-guided prior: rank ALL candidate cell types (e.g. the 326 FlyWire visual projection types) by how
+    strongly the signed FlyWire v783 connectome predicts they excite a target group (e.g. MDN = moonwalker / backward
+    walking). Cheap (seconds, no simulation). A high score is a PREDICTION to be tested with run_brain_screen, not a result.
+    :param target_group: Target neuron group, e.g. "MDN" (backward walking) or "GF" (escape).
+    :param candidate_kind: "visual_projection", "descending", "ascending", "sensory" or a regex on cell types.
+    :param top_k: How many top-ranked candidates to return (1-40).
+    :param max_hops: Path length considered (1 = direct synapses only, 2 = + two-hop excitatory paths).
+    :param agent: Calling agent role name.
+    :param run_id: Run id; default = active run.
+    :returns: {"n_candidates", "top": [{rank, cell_type, n, score, direct_syn, two_hop_score, sign_note}],
+        "literature_known_hits": {cell_type: {"rank", "score", "gt_ids"}}, "runtime_s", "method"}
+    """
+    rid = _rid(run_id)
+    top_k = max(1, min(int(top_k), 40))
+    t0 = time.time()
+    try:
+        if _mock("screen"):
+            ranked = [{"rank": i + 1, "cell_type": c, "n": 10 + i, "score": round(0.003 / (i + 1), 6), "direct_syn": 0,
+                       "two_hop_score": round(0.003 / (i + 1), 6), "sign_note": "MOCK"} for i, c in enumerate(_MOCK_SCREEN_TYPES)]
+            n_total, known = len(ranked), {}
+        else:
+            from flylab import screen
+            full = screen.rank_by_connectome(target_group, candidate_kind, max_hops=int(max_hops))
+            n_total = len(full)
+            ranked = [{k: r.get(k) for k in ("rank", "cell_type", "n", "score", "direct_syn", "two_hop_score", "sign_note")}
+                      for r in full[:top_k]]
+            pos = {r["cell_type"]: r for r in full}
+            known = {ct: {"rank": pos[ct]["rank"] if ct in pos else None,
+                          "score": pos[ct]["score"] if ct in pos else None, "gt_ids": gts}
+                     for ct, gts in _screen_known_hits(target_group).items()}
+        for r in ranked:
+            if isinstance(r.get("score"), float):
+                r["score"] = round(r["score"], 6)
+        out = {"ok": True, "run_id": rid, "target_group": target_group, "candidate_kind": candidate_kind,
+               "n_candidates": n_total, "top_k": top_k, "top": ranked, "literature_known_hits": known,
+               "runtime_s": round(time.time() - t0, 2), "max_hops": max_hops,
+               "method": "signed input-fraction connectome score, direct + 2-hop excitatory paths "
+                         "(flylab.screen.rank_by_connectome); a prior from the SAME connectome the brain model uses",
+               "mock": _mock("screen")}
+        if _mock("screen"):
+            out["notice"] = MOCK_NOTICE
+        record.log_event(rid, agent, "evidence",
+                         f"Connectome ranking of {n_total} {candidate_kind} types -> {target_group}: top "
+                         + ", ".join(str(r["cell_type"]) for r in ranked[:5]) + (" [MOCK]" if _mock("screen") else ""),
+                         {"kind": "connectome_ranking", "target_group": target_group, "candidate_kind": candidate_kind,
+                          "n_candidates": n_total, "top": ranked, "literature_known_hits": known,
+                          "runtime_s": out["runtime_s"], "provenance": "computed connectome prior (prediction, not a result)",
+                          "mock": _mock("screen")})
+        return out
+    except Exception as exc:
+        return _err("rank_candidates", exc, rid, agent)
+
+
+def run_brain_screen(candidates: list, target_groups: list, rate_hz: float = 150.0, duration_ms: float = 500.0,
+                     n_trials: int = 2, agent: str = "runner", run_id: str = "") -> dict:
+    """In-silico activation screen: activate each candidate cell type (all its neurons, Poisson input) in the whole-brain
+    LIF model (FlyWire v783, Shiu et al. 2024) and read the mean firing rate of each target group. A candidate is a HIT
+    when a target fires >= 5 Hz (model baseline is 0 Hz). Cost ~1 s wall per candidate per trial-second.
+    Gated by policy: > 40 candidates per call is denied; > 10 000 simulated ms in total needs approval.
+    :param candidates: Cell types to activate, e.g. ["LC16", "LPLC2", "LC9"] (from rank_candidates).
+    :param target_groups: Groups to read out, e.g. ["MDN", "GF", "P9"].
+    :param rate_hz: Poisson activation rate (Hz).
+    :param duration_ms: Simulated time per trial (ms).
+    :param n_trials: Trials per candidate.
+    :param agent: Calling agent role name.
+    :param run_id: Run id; default = active run.
+    :returns: {"rows": [{cell_type, n_stimulated, target_rates, hit_targets, runtime_s, cached}], "hits", "runtime_s"}
+    """
+    rid = _rid(run_id)
+    cands, targets = _as_list(candidates), _as_list(target_groups)
+    t0 = time.time()
+    try:
+        if not cands or not targets:
+            raise ValueError("candidates and target_groups must be non-empty")
+        if _mock("screen"):
+            rows = [{"cell_type": c, "n_stimulated": 10, "cached": False, "runtime_s": 0.01,
+                     "target_rates": {g: (12.0 if (i == 0 and g in ("MDN", "MDN_L", "MDN_R")) else 0.0) for g in targets}}
+                    for i, c in enumerate(cands)]
+        else:
+            from flylab import screen
+            rows = screen.brain_screen(cands, targets, rate_hz=float(rate_hz), duration_ms=float(duration_ms),
+                                       n_trials=int(n_trials), n_threads=4)
+        for r in rows:
+            r["hit_targets"] = [g for g, v in (r.get("target_rates") or {}).items() if float(v) >= SCREEN_HIT_HZ]
+        hits = [r["cell_type"] for r in rows if r["hit_targets"]]
+        wall = round(time.time() - t0, 2)
+        mock = _mock("screen")
+        path = _save_json(_next_artifact(rid, "screen", "json"),
+                          {"inputs": {"candidates": cands, "target_groups": targets, "rate_hz": rate_hz,
+                                      "duration_ms": duration_ms, "n_trials": n_trials},
+                           "hit_threshold_hz": SCREEN_HIT_HZ, "rows": rows, "hits": hits, "wall_s": wall, "mock": mock})
+        out = {"ok": True, "run_id": rid, "kind": "screen", "n_candidates": len(cands), "target_groups": targets,
+               "rows": rows, "hits": hits, "hit_threshold_hz": SCREEN_HIT_HZ, "runtime_s": wall,
+               "sim_runtime_s_sum": round(sum(float(r.get("runtime_s") or 0) for r in rows), 2),
+               "n_cached": sum(1 for r in rows if r.get("cached")), "artifact": path, "mock": mock,
+               "note": "cached rows were simulated earlier with identical parameters (runtime_s = original measured time)"}
+        if mock:
+            out["notice"] = MOCK_NOTICE
+        record.log_event(rid, agent, "experiment_result",
+                         f"Brain screen: {len(cands)} candidates -> {targets}; hits (>= {SCREEN_HIT_HZ} Hz): {hits or 'none'}"
+                         + (" [MOCK]" if mock else ""),
+                         {"kind": "screen", "candidates": cands, "target_groups": targets, "rate_hz": rate_hz,
+                          "duration_ms": duration_ms, "n_trials": n_trials, "rows": rows, "hits": hits,
+                          "runtime_s": wall, "artifact": path, "mock": mock})
+        return out
+    except Exception as exc:
+        return _err("run_brain_screen", exc, rid, agent)
+
+
+def get_benchmark(name: str = "", agent: str = "", run_id: str = "") -> dict:
+    """Read a committed benchmark from data/benchmarks/ (e.g. "screen_MDN": measured acceleration of the
+    connectome-guided screen vs random order vs exhaustive; "brain_validation": brain model vs paper).
+    :param name: Benchmark name without .json; empty = list the available benchmarks.
+    :param agent: Calling agent role name (read-only, not logged).
+    :param run_id: Unused, accepted for uniformity.
+    :returns: {"available": [...], "benchmark": {...}} (long lists truncated).
+    """
+    bdir = record.ROOT / "data" / "benchmarks"
+    avail = sorted(p.stem for p in bdir.glob("*.json")) if bdir.exists() else []
+    try:
+        if not name:
+            return {"ok": True, "available": avail}
+        stem = Path(str(name)).stem
+        path = bdir / f"{stem}.json"
+        if not path.exists():
+            if _mock("screen"):
+                return {"ok": True, "available": avail, "mock": True, "notice": MOCK_NOTICE,
+                        "benchmark": {"name": stem, "experiments_to_first_hit": {"guided": 2, "random_expected": 40.0},
+                                      "reduction_factor_first_hit": 20.0}}
+            return {"ok": False, "available": avail,
+                    "error": f"benchmark {stem!r} not found (not computed yet?) - use one of {avail}"}
+        data = json.loads(path.read_text(encoding="utf-8"))
+
+        def slim(x: Any, depth: int = 0) -> Any:
+            if isinstance(x, dict):
+                return {k: slim(v, depth + 1) for k, v in list(x.items())[:40]}
+            if isinstance(x, list):
+                return [slim(v, depth + 1) for v in x[:12]] + ([f"... {len(x) - 12} more"] if len(x) > 12 else [])
+            if isinstance(x, str) and len(x) > 600:
+                return x[:600] + "..."
+            return x
+        s = slim(data)
+        txt = json.dumps(s, default=str)
+        if len(txt) > 12000:
+            s = {k: (v if len(json.dumps(v, default=str)) < 2500 else "(large - see file)") for k, v in s.items()} \
+                if isinstance(s, dict) else txt[:12000]
+        return {"ok": True, "available": avail, "name": stem, "file": f"data/benchmarks/{stem}.json", "benchmark": s}
+    except Exception as exc:
+        return _err("get_benchmark", exc)
+
+
 # =========================================================================== Omnigent policy
 
 
@@ -865,18 +1087,37 @@ def _embodied_runs_in_record() -> int:
         return 0
 
 
-def approval_gate(ask_tools: list = None, brain_ms_threshold: float = 10000.0, max_embodied_runs: int = 6):
+def approval_gate(ask_tools: list = None, brain_ms_threshold: float = 10000.0, max_embodied_runs: int = 6,
+                  max_screen_candidates: int = 40):
     """Omnigent policy factory: human approval for expensive / risky lab actions.
 
     * tool calls to any of ``ask_tools`` -> ASK (human approves in the Omnigent UI/REPL)
     * run_brain_experiment with duration_ms * n_trials > brain_ms_threshold -> ASK
+    * run_brain_screen with n_candidates * duration_ms * n_trials > brain_ms_threshold -> ASK;
+      more than ``max_screen_candidates`` candidates in one call -> DENY (e.g. an exhaustive
+      326-type screen must be split or replaced by a connectome-guided top-k screen)
     * more than ``max_embodied_runs`` embodied runs (per Omnigent session, and per research run as
       counted in the active record) -> DENY (hard cap)
+    Scripted runs: if a human pre-approved at launch (``agents/omni.ps1 -ApproveAtLaunch`` -> flag file,
+    see ``_preapproval``), every ASK above becomes ALLOW; the DENY caps stay.
     Abstains (None) on everything else so other policies (cost budget, tool-call cap) decide.
     """
     ask = set(ask_tools or _EXPENSIVE_DEFAULT)
     key = "_flylab_embodied_runs"
+
+    def _ask(resp: dict) -> dict:
+        if _preapproval():
+            out = {"result": "ALLOW", "reason": "pre-approved at launch (omni.ps1 -ApproveAtLaunch): " + resp.get("reason", "")}
+            if resp.get("state_updates"):
+                out["state_updates"] = resp["state_updates"]
+            return out
+        return resp
+
     def evaluate(event: dict):
+        resp = _evaluate(event)
+        return _ask(resp) if resp and resp.get("result") == "ASK" else resp
+
+    def _evaluate(event: dict):
         if event.get("type") != "tool_call":
             return None
         data = event.get("data") or {}
@@ -912,6 +1153,20 @@ def approval_gate(ask_tools: list = None, brain_ms_threshold: float = 10000.0, m
                 return {"result": "ASK", "reason": f"Long brain simulation ({cost:.0f} simulated ms in total, "
                                                   f"excite={args.get('excite_groups')}). Approve?"}
             return None
+        if name == "run_brain_screen":
+            cands = _as_list(args.get("candidates"))
+            if len(cands) > max_screen_candidates:
+                return {"result": "DENY", "reason": f"Screen of {len(cands)} candidates exceeds the cap of "
+                                                    f"{max_screen_candidates} per call. Use rank_candidates and screen "
+                                                    "the connectome-guided top-k, or split the screen."}
+            try:
+                cost = len(cands) * float(args.get("duration_ms", 500)) * float(args.get("n_trials", 2))
+            except (TypeError, ValueError):
+                cost = 0.0
+            if cost > brain_ms_threshold or name in ask:
+                return {"result": "ASK", "reason": f"Brain screen of {len(cands)} candidate types ({cost:.0f} simulated "
+                                                  f"ms in total, targets={args.get('target_groups')}). Approve?"}
+            return None
         if name in ask:
             if name == "request_approval":
                 return {"result": "ASK", "reason": f"Lab approval request: {args.get('action')} | reason: "
@@ -927,7 +1182,7 @@ def approval_gate(ask_tools: list = None, brain_ms_threshold: float = 10000.0, m
 ALL_TOOLS = [start_run, get_record, log_note, search_literature, list_neuron_groups, lookup_neurons,
              list_ground_truth, log_hypothesis, estimate_cost, log_experiment_plan, log_decision,
              request_approval, run_brain_experiment, run_body_experiment, run_embodied_experiment,
-             compare_to_ground_truth]
+             compare_to_ground_truth, rank_candidates, run_brain_screen, get_benchmark]
 
 
 def _selftest(keep: bool = False) -> int:
@@ -959,6 +1214,10 @@ def _selftest(keep: bool = False) -> int:
             compare_to_ground_truth("turn_right", "gt_mock_p9l_activate"),  # opposite laterality -> inconsistent
             log_decision("Surprise on P9_L: test P9_R next", "turn direction mismatch", "run P9_R", "laterality of P9"),
             get_record(last_n=5),
+            rank_candidates("MDN", top_k=3),
+            run_brain_screen(["MOCK_LC16", "MOCK_LC9"], ["MDN"]),
+            get_benchmark(""),
+            estimate_cost("screen", duration_ms=500, n_trials=2, n_candidates=326),
         ]
         bad = [s for s in steps if not s.get("ok", True)]
         for s in steps:
@@ -973,6 +1232,20 @@ def _selftest(keep: bool = False) -> int:
         assert pol({"type": "tool_call", "data": {"name": "search_literature", "arguments": {}}}) is None
         assert pol({"type": "tool_call", "session_state": {"_flylab_embodied_runs": 6},
                     "data": {"name": "run_embodied_experiment", "arguments": {}}})["result"] == "DENY"
+        assert steps[17]["hits"] == ["MOCK_LC16"], steps[17]
+        assert steps[19]["denied_by_policy"] is True and steps[19]["cost_units"] > 50, steps[19]
+        big = {"type": "tool_call", "data": {"name": "run_brain_screen",
+                                             "arguments": {"candidates": [f"T{i}" for i in range(41)], "target_groups": ["MDN"]}}}
+        assert pol(big)["result"] == "DENY"
+        mid = {"type": "tool_call", "data": {"name": "run_brain_screen",
+                                             "arguments": {"candidates": [f"T{i}" for i in range(12)], "target_groups": ["MDN"]}}}
+        assert pol(mid)["result"] == "ASK"
+        os.environ["FLYLAB_PREAPPROVE"] = '{"by": "selftest"}'
+        try:
+            assert pol(mid)["result"] == "ALLOW" and pol(big)["result"] == "DENY"
+            assert request_approval("x", "y", 1.0)["status"] == "pre-approved"
+        finally:
+            os.environ.pop("FLYLAB_PREAPPROVE", None)
         print(json.dumps(record.summarize(rid), indent=1))
         print("failed steps:", [b.get("tool") for b in bad])
         return 1 if bad else 0

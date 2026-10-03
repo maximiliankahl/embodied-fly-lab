@@ -1,0 +1,268 @@
+{
+ "_meta": {
+  "source": "spikes/brain/out/validation.json (uv run python -m flylab.brain --validate), condensed by spikes/dashboard/make_brain_validation.py; numbers copied, not recomputed",
+  "paper": {
+   "doi": "10.1038/s41586-024-07763-9",
+   "code": "https://github.com/philshiu/Drosophila_brain_model"
+  },
+  "connectome": "FlyWire v783",
+  "n_neurons": 138639,
+  "n_trials": 10,
+  "duration_ms": 1000.0,
+  "params": {
+   "v_0_mV": -52.0,
+   "v_rst_mV": -52.0,
+   "v_th_mV": -45.0,
+   "t_mbr_ms": 20.0,
+   "tau_ms": 5.0,
+   "t_rfc_ms": 2.2,
+   "t_dly_ms": 1.8,
+   "w_syn_mV": 0.275,
+   "f_poi": 250.0,
+   "dt_ms": 0.1
+  },
+  "mn9_ids": {
+   "MN9_a (paper id_mn9; contralateral, v783 side R)": 720575940660219265,
+   "MN9_b (CB0701 partner; ipsilateral, v783 side L)": 720575940618238523
+  },
+  "side_note": "Notebook code comments: sugar GRNs 'right', id_mn9 'left' (old inverted FAFB convention). Paper text (true biological side): left-hemisphere GRN activation. FlyWire v783 annotation agrees with the paper text: GRNs side=left, MN9_a side=right (contralateral), MN9_b side=left (ipsilateral).",
+  "silencing_semantics": "silence = outgoing synapses set to 0 (model.py silence()); silenced neurons are reported with effective rate 0 in 'rates', raw spikes in 'silenced_spiking_rates'"
+ },
+ "checks": [
+  {
+   "claim": "Baseline firing of every neuron is 0 Hz (paper: 'The baseline firing of each neuron in our model is 0 Hz')",
+   "ours": "0 active neurons",
+   "agree": true
+  },
+  {
+   "claim": "Sugar GRN activation at 100 Hz robustly activates MN9 in 100% of simulations (paper, shuffle-control text)",
+   "ours": "MN9_a active in 10/10 trials, 61.6 Hz; MN9_b active in 10/10 trials, 47.6 Hz",
+   "agree": true
+  },
+  {
+   "claim": "w_syn was chosen so that sugar 100 Hz gives roughly 80% of maximal MN9 firing (paper Methods)",
+   "ours": "MN9 max(100 Hz)/max(200 Hz) = 61.6/90.6 = 0.68",
+   "agree": "partial: MN9 at 100 Hz is clearly sub-maximal but the ratio differs from ~0.8 (paper tuned w_syn on v630; this is v783)"
+  },
+  {
+   "claim": "MN9 rate increases with sugar GRN rate (not quoted from the paper; implied by its w_syn tuning to ~80% of maximal MN9 firing at 100 Hz)",
+   "ours": [
+    0.0,
+    11.5,
+    61.6,
+    77.6,
+    90.6
+   ],
+   "agree": true
+  },
+  {
+   "claim": "Number of responsive neurons: 45 at 10 Hz, 455 at 200 Hz sugar (paper, v630 with 127,400 neurons, 30 trials)",
+   "ours": "40 at 10 Hz, 437 at 200 Hz including the 20 stimulated GRNs (20 / 417 without them); v783, 138639 neurons, 10 trials (fewer trials -> fewer rarely-firing neurons counted)",
+   "agree": "approximate only (different connectome version and trial count; the paper does not state whether its count includes the stimulated GRNs)"
+  },
+  {
+   "claim": "Unilateral sugar GRN activation drives the contralateral MN9 more strongly than the ipsilateral MN9 (paper Fig. 1c)",
+   "ours": [
+    {
+     "rate_hz": 50,
+     "contra_MN9_a": 11.5,
+     "ipsi_MN9_b": 9.8
+    },
+    {
+     "rate_hz": 100,
+     "contra_MN9_a": 61.6,
+     "ipsi_MN9_b": 47.6
+    },
+    {
+     "rate_hz": 150,
+     "contra_MN9_a": 77.6,
+     "ipsi_MN9_b": 58.6
+    },
+    {
+     "rate_hz": 200,
+     "contra_MN9_a": 90.6,
+     "ipsi_MN9_b": 62.7
+    }
+   ],
+   "agree": true
+  },
+  {
+   "claim": "Sanity (not a paper claim): silencing the stimulated sugar GRNs removes their output, so MN9 must stay at 0 Hz",
+   "ours": "MN9 max = 0.0 Hz",
+   "agree": true
+  },
+  {
+   "claim": "Bitter GRNs do not activate MN9 and suppress sugar-evoked MN9 firing (paper Fig. 3a)",
+   "ours": "bitter alone MN9 max = 0.0 Hz; sugar+bitter = 12.3 Hz vs sugar alone 61.6 Hz",
+   "agree": true
+  },
+  {
+   "claim": "Number of responsive neurons with the paper's trial count (30 x 1 s): 45 at 10 Hz, 455 at 200 Hz",
+   "ours": "45 at 10 Hz, 447 at 200 Hz including the 20 GRNs (25 / 427 without them)",
+   "agree": "close if the paper counts the GRNs (45 vs 45, 447 vs 455); v630 vs v783 connectome"
+  }
+ ],
+ "conditions": [
+  {
+   "condition": "no stimulation (baseline)",
+   "n_active": 0,
+   "runtime_s": 40.498,
+   "MN9_a_hz": 0.0,
+   "MN9_a_std_hz": 0.0,
+   "MN9_a_trials_active": "0/10",
+   "MN9_b_hz": 0.0,
+   "MN9_b_std_hz": 0.0,
+   "MN9_b_trials_active": "0/10"
+  },
+  {
+   "condition": "sugar GRNs 10 Hz",
+   "n_active": 40,
+   "runtime_s": 26.139,
+   "MN9_a_hz": 0.0,
+   "MN9_a_std_hz": 0.0,
+   "MN9_a_trials_active": "0/10",
+   "MN9_b_hz": 0.0,
+   "MN9_b_std_hz": 0.0,
+   "MN9_b_trials_active": "0/10"
+  },
+  {
+   "condition": "sugar GRNs 50 Hz",
+   "n_active": 347,
+   "runtime_s": 7.375,
+   "MN9_a_hz": 11.5,
+   "MN9_a_std_hz": 3.61,
+   "MN9_a_trials_active": "10/10",
+   "MN9_b_hz": 9.8,
+   "MN9_b_std_hz": 3.4,
+   "MN9_b_trials_active": "10/10"
+  },
+  {
+   "condition": "sugar GRNs 100 Hz",
+   "n_active": 380,
+   "runtime_s": 8.448,
+   "MN9_a_hz": 61.6,
+   "MN9_a_std_hz": 5.28,
+   "MN9_a_trials_active": "10/10",
+   "MN9_b_hz": 47.6,
+   "MN9_b_std_hz": 4.74,
+   "MN9_b_trials_active": "10/10"
+  },
+  {
+   "condition": "sugar GRNs 150 Hz",
+   "n_active": 409,
+   "runtime_s": 8.751,
+   "MN9_a_hz": 77.6,
+   "MN9_a_std_hz": 4.96,
+   "MN9_a_trials_active": "10/10",
+   "MN9_b_hz": 58.6,
+   "MN9_b_std_hz": 3.5,
+   "MN9_b_trials_active": "10/10"
+  },
+  {
+   "condition": "sugar GRNs 200 Hz",
+   "n_active": 437,
+   "runtime_s": 9.334,
+   "MN9_a_hz": 90.6,
+   "MN9_a_std_hz": 3.83,
+   "MN9_a_trials_active": "10/10",
+   "MN9_b_hz": 62.7,
+   "MN9_b_std_hz": 3.69,
+   "MN9_b_trials_active": "10/10"
+  },
+  {
+   "condition": "bitter GRNs 100 Hz (control)",
+   "n_active": 58,
+   "runtime_s": 6.914,
+   "MN9_a_hz": 0.0,
+   "MN9_a_std_hz": 0.0,
+   "MN9_a_trials_active": "0/10",
+   "MN9_b_hz": 0.0,
+   "MN9_b_std_hz": 0.0,
+   "MN9_b_trials_active": "0/10"
+  },
+  {
+   "condition": "sugar 100 Hz + bitter 100 Hz",
+   "n_active": 341,
+   "runtime_s": 7.918,
+   "MN9_a_hz": 3.2,
+   "MN9_a_std_hz": 2.36,
+   "MN9_a_trials_active": "10/10",
+   "MN9_b_hz": 12.3,
+   "MN9_b_std_hz": 2.72,
+   "MN9_b_trials_active": "10/10"
+  },
+  {
+   "condition": "sugar 100 Hz, GRNs silenced (sanity)",
+   "n_active": 0,
+   "runtime_s": 6.619,
+   "MN9_a_hz": 0.0,
+   "MN9_a_std_hz": 0.0,
+   "MN9_a_trials_active": "0/10",
+   "MN9_b_hz": 0.0,
+   "MN9_b_std_hz": 0.0,
+   "MN9_b_trials_active": "0/10"
+  }
+ ],
+ "sugar_dose_response": [
+  {
+   "sugar_rate_hz": 10.0,
+   "MN9_a_hz": 0.0,
+   "MN9_b_hz": 0.0,
+   "n_active": 40
+  },
+  {
+   "sugar_rate_hz": 50.0,
+   "MN9_a_hz": 11.5,
+   "MN9_b_hz": 9.8,
+   "n_active": 347
+  },
+  {
+   "sugar_rate_hz": 100.0,
+   "MN9_a_hz": 61.6,
+   "MN9_b_hz": 47.6,
+   "n_active": 380
+  },
+  {
+   "sugar_rate_hz": 150.0,
+   "MN9_a_hz": 77.6,
+   "MN9_b_hz": 58.6,
+   "n_active": 409
+  },
+  {
+   "sugar_rate_hz": 200.0,
+   "MN9_a_hz": 90.6,
+   "MN9_b_hz": 62.7,
+   "n_active": 437
+  }
+ ],
+ "speed_s_per_trial_per_sim_s": 0.933,
+ "brian2_crosscheck": {
+  "what": "same LIF equations simulated with Brian2 (reference implementation of Shiu et al.) on a sugar-GRN subnetwork, 100 Hz stimulation",
+  "n_neurons": 426,
+  "n_connections": 19826,
+  "n_trials": 16,
+  "pearson_r_nonstim_rates": 0.9987,
+  "n_active_nonstim": {
+   "brian2": 354,
+   "ours": 353
+  },
+  "total_rate_nonstim_hz": {
+   "brian2": 6964.125,
+   "ours": 6980.8125
+  },
+  "mn9": {
+   "720575940660219265": {
+    "brian2_mean": 60.44,
+    "brian2_std": 4.83,
+    "ours_mean": 62.94,
+    "ours_std": 5.4
+   },
+   "720575940618238523": {
+    "brian2_mean": 47.25,
+    "brian2_std": 3.56,
+    "ours_mean": 47.81,
+    "ours_std": 3.66
+   }
+  }
+ }
+}

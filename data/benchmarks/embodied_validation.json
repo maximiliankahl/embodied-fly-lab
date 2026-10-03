@@ -1,0 +1,1339 @@
+{
+ "what": "End-to-end embodied validation: FlyWire v783 LIF brain -> flylab.bridge -> NeuroMechFly body",
+ "created": "2026-10-04 00:38:09",
+ "protocol": {
+  "brain_duration_ms": 1000.0,
+  "n_trials": 3,
+  "excite_rate_hz": 150.0,
+  "body_duration_s": 1.0,
+  "body_control_every": 5,
+  "seed": 0,
+  "bridge_ref_rate_hz": 148.3,
+  "readout_threshold_hz": 1.0
+ },
+ "bridge": {
+  "name": "flylab.bridge (hand-designed brain->body interface)",
+  "scope": "FlyWire v783 covers the brain only; the ventral nerve cord is NOT simulated. This bridge replaces it with a transparent mapping from 4 descending-neuron types to the body's 3-number drive.",
+  "activation": "a(g) = min(1, mean_rate_hz(g) / ref_rate_hz)",
+  "ref_rate_hz": 148.3,
+  "calibration": {
+   "ref_rate_hz": 148.3,
+   "statistic": "median over 15 group-sides of the self-rate under direct drive",
+   "protocol": "flylab.brain.simulate(excite=<group>, excite_rate_hz=150, duration_ms=1000, n_trials=3, seed=0)",
+   "groups": [
+    "MDN",
+    "P9",
+    "P9_L",
+    "DNa01_L",
+    "DNa01_R",
+    "DNa02_L",
+    "DNa02_R",
+    "GF",
+    "aDN1_shiu2024",
+    "aDN2_shiu2024",
+    "MN9"
+   ],
+   "self_rates_hz": [
+    146.33,
+    146.33,
+    146.33,
+    146.33,
+    146.33,
+    146.33,
+    146.67,
+    148.33,
+    148.33,
+    150.0,
+    159.67,
+    163.5,
+    164.67,
+    164.67,
+    179.0
+   ],
+   "range_hz": [
+    146.33,
+    179.0
+   ],
+   "mean_hz": 153.5,
+   "script": "spikes/bridge/calibrate.py (raw output spikes/bridge/out/calibration.json)",
+   "note": "Values above 150 Hz come from recurrent excitation between co-activated partners (e.g. both GFs); a single directly driven neuron reaches ~146 Hz (Poisson input on a 0.1 ms grid)."
+  },
+  "drive_terms": [
+   {
+    "output": "forward",
+    "groups": [
+     "P9_L",
+     "P9_R"
+    ],
+    "weight": 1.0,
+    "formula": "forward = 1.0 * mean(a(P9_L), a(P9_R))",
+    "sign": "+",
+    "citations": [
+     "10.1016/j.neuron.2020.07.032"
+    ],
+    "description": "DNp09 (P9): bilateral activation initiates forward walking (Bidaye et al. 2020, Neuron)."
+   },
+   {
+    "output": "backward",
+    "groups": [
+     "MDN_L",
+     "MDN_R"
+    ],
+    "weight": 1.0,
+    "formula": "backward = 1.0 * mean(a(MDN_L), a(MDN_R))",
+    "sign": "+",
+    "citations": [
+     "10.1126/science.1249964"
+    ],
+    "description": "Moonwalker DNs: activation is sufficient for backward walking (Bidaye et al. 2014, Science)."
+   },
+   {
+    "output": "turn",
+    "groups": [
+     "DNa02_L",
+     "DNa02_R"
+    ],
+    "weight": 1.0,
+    "formula": "turn += 1.0 * (a(DNa02_R) - a(DNa02_L))",
+    "sign": "left-dominant -> negative (left turn, ipsilateral)",
+    "citations": [
+     "10.7554/elife.102230"
+    ],
+    "description": "DNa02: unilateral activation influences ipsilateral rotation; large/transient (high-gain) steering (Rayshubskiy et al. 2025, eLife)."
+   },
+   {
+    "output": "turn",
+    "groups": [
+     "DNa01_L",
+     "DNa01_R"
+    ],
+    "weight": 0.5,
+    "formula": "turn += 0.5 * (a(DNa01_R) - a(DNa01_L))",
+    "sign": "left-dominant -> negative (left turn, ipsilateral)",
+    "citations": [
+     "10.7554/elife.102230"
+    ],
+    "description": "DNa01: predicts sustained, lower-gain steering (Rayshubskiy et al. 2025, eLife); half weight (our choice)."
+   },
+   {
+    "output": "turn",
+    "groups": [
+     "P9_L",
+     "P9_R"
+    ],
+    "weight": 0.5,
+    "formula": "turn += 0.5 * (a(P9_R) - a(P9_L))",
+    "sign": "left-dominant -> negative (left turn, ipsilateral)",
+    "citations": [
+     "10.1016/j.neuron.2020.07.032"
+    ],
+    "description": "P9: 'forward walking with ipsilateral turning' (Bidaye et al. 2020); unilateral -> ipsilateral turn. Half weight (our choice)."
+   }
+  ],
+  "turn_clip": [
+   -1.0,
+   1.0
+  ],
+  "readouts": [
+   {
+    "behavior": "escape",
+    "groups": [
+     "GF_L",
+     "GF_R"
+    ],
+    "threshold_hz": 1.0,
+    "rule": "max rate >= threshold",
+    "citations": [
+     "10.1016/j.cell.2005.02.004",
+     "10.1038/nn.3741"
+    ],
+    "description": "Giant fiber (DNp01): activation elicits escape takeoff/jump."
+   },
+   {
+    "behavior": "feed",
+    "groups": [
+     "MN9_L",
+     "MN9_R"
+    ],
+    "threshold_hz": 1.0,
+    "rule": "max rate >= threshold",
+    "citations": [
+     "10.1016/j.neuron.2008.12.033",
+     "10.1038/s41586-024-07763-9"
+    ],
+    "description": "MN9 proboscis motor neuron: proxy for proboscis extension / feeding initiation (as in Shiu et al. 2024)."
+   },
+   {
+    "behavior": "groom",
+    "groups": [
+     "aDN1_shiu2024",
+     "aDN2_shiu2024"
+    ],
+    "threshold_hz": 1.0,
+    "rule": "max rate >= threshold",
+    "citations": [
+     "10.7554/eLife.08758",
+     "10.1038/s41586-024-07763-9"
+    ],
+    "description": "Antennal grooming DNs aDN1/aDN2 (Hampel et al. 2015), IDs as used in Shiu et al. 2024 Fig. 5."
+   }
+  ],
+  "readout_threshold_note": "Shiu et al. 2024 (doi:10.1038/s41586-024-07763-9): activated neurons are those with 'greater than 0 Hz firing'; we use >= 1 Hz to ignore isolated single spikes.",
+  "body": "flylab.body (NeuroMechFly / flygym 2.1 hybrid turning controller), doi:10.1038/s41592-024-02497-y",
+  "limitations": [
+   "Weights (1.0 / 0.5 / 0.5) and the linear-saturating activation are hand-chosen, not fitted.",
+   "Only P9, MDN, DNa01, DNa02 drive the body; all other descending neurons are ignored.",
+   "Open loop: time-averaged brain rates -> constant body command; no body->brain feedback.",
+   "Steering DNs without a locomotor DN give turning in place; papers tested walking flies.",
+   "MDN asymmetry (backward turning) not mapped; backward gait = reversed forward kinematics.",
+   "Escape / feeding / grooming are brain-level readouts only (the body cannot jump, groom or feed)."
+  ]
+ },
+ "caveats": [
+  "Partly circular: the bridge maps P9->forward, MDN->backward, DNa01/DNa02 asymmetry->turn using the same papers that define gt01/gt03-gt06, so direct-DN rows mainly test the plumbing and sign conventions (brain -> bridge -> body), not a discovery.",
+  "Non-trivial (emergent from the connectome model) rows: LPLC2 (GF escape yes, MDN/backward no), sugar GRN -> MN9, JO-C/E -> aDN1/aDN2, P9 -> DNa02 recruitment. The brain-level readout results reproduce Shiu et al. 2024 model behaviour rather than new findings.",
+  "Single seed per condition for brain and main body run; body label stability checked with 3 phase-noise seeds (body_seed_robustness). The rest of the VNC is replaced by a hand-designed mapping.",
+  "The MDN-silencing row is uninformative (MDN at 0 Hz without silencing): its verdict is 'inconclusive' (raw_verdict kept) and it is excluded from hit_rate.",
+  "Body labels come from flylab.body.classify thresholds (yaw rate, displacement); 'turn' rows for DNa02 are turning in place because no locomotor DN is active."
+ ],
+ "rows": [
+  {
+   "condition": "control",
+   "stimulus_groups": [],
+   "silenced_groups": [],
+   "key_group_rates_hz": {
+    "P9_L": 0.0,
+    "P9_R": 0.0,
+    "MDN_L": 0.0,
+    "MDN_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0,
+    "DNa01_L": 0.0,
+    "DNa01_R": 0.0,
+    "GF_L": 0.0,
+    "GF_R": 0.0,
+    "MN9_L": 0.0,
+    "MN9_R": 0.0,
+    "aDN1_shiu2024": 0.0,
+    "aDN2_shiu2024": 0.0
+   },
+   "n_active_neurons": 0,
+   "drive": {
+    "forward": 0.0,
+    "turn": 0.0,
+    "backward": 0.0
+   },
+   "behavior": "stop",
+   "body_metrics": {
+    "behavior": "stop",
+    "forward_disp_mm": 0.033,
+    "lateral_disp_mm": 0.008,
+    "heading_change_deg": 0.22,
+    "yaw_rate_deg_s": 0.22,
+    "net_speed_mm_s": 0.034,
+    "mean_speed_mm_s": 0.103,
+    "fell_over": false,
+    "warnings": null,
+    "descending_signal": [
+     0.0,
+     0.0
+    ],
+    "runtime_s": 4.48,
+    "control_every": 5
+   },
+   "brain_readouts": {
+    "escape": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "GF_L": 0.0,
+      "GF_R": 0.0
+     }
+    },
+    "feed": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "MN9_L": 0.0,
+      "MN9_R": 0.0
+     }
+    },
+    "groom": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "aDN1_shiu2024": 0.0,
+      "aDN2_shiu2024": 0.0
+     }
+    }
+   },
+   "checks": [],
+   "gt_id": null,
+   "verdict": "no_ground_truth",
+   "runtimes_s": {
+    "brain": 0.0,
+    "body": 4.48,
+    "total": 6.92
+   },
+   "video": "assets/embodied/control.mp4",
+   "note": "No stimulation. The Shiu et al. model has 0 Hz baseline, so the brain is silent (not simulated) and the body receives a zero drive.",
+   "body_seed_robustness": {
+    "phase_noise_rad": 0.5,
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "stop",
+     "stop",
+     "stop"
+    ],
+    "fraction_same_as_main": 1.0
+   }
+  },
+  {
+   "condition": "MDN_bilateral",
+   "stimulus_groups": [
+    "MDN"
+   ],
+   "silenced_groups": [],
+   "key_group_rates_hz": {
+    "P9_L": 0.0,
+    "P9_R": 0.0,
+    "MDN_L": 150.0,
+    "MDN_R": 163.5,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0,
+    "DNa01_L": 0.0,
+    "DNa01_R": 0.0,
+    "GF_L": 0.0,
+    "GF_R": 0.0,
+    "MN9_L": 0.0,
+    "MN9_R": 0.0,
+    "aDN1_shiu2024": 0.0,
+    "aDN2_shiu2024": 0.0
+   },
+   "n_active_neurons": 27,
+   "drive": {
+    "forward": 0.0,
+    "turn": 0.0,
+    "backward": 1.0
+   },
+   "behavior": "backward",
+   "body_metrics": {
+    "behavior": "backward",
+    "forward_disp_mm": -9.791,
+    "lateral_disp_mm": 0.154,
+    "heading_change_deg": -20.81,
+    "yaw_rate_deg_s": -20.81,
+    "net_speed_mm_s": 9.792,
+    "mean_speed_mm_s": 19.8,
+    "fell_over": false,
+    "warnings": null,
+    "descending_signal": [
+     -1.2,
+     -1.2
+    ],
+    "runtime_s": 4.28,
+    "control_every": 5
+   },
+   "brain_readouts": {
+    "escape": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "GF_L": 0.0,
+      "GF_R": 0.0
+     }
+    },
+    "feed": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "MN9_L": 0.0,
+      "MN9_R": 0.0
+     }
+    },
+    "groom": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "aDN1_shiu2024": 0.0,
+      "aDN2_shiu2024": 0.0
+     }
+    }
+   },
+   "checks": [
+    {
+     "gt_id": "gt01_mdn_activate_backward",
+     "comparison": "body behavior",
+     "observed": "backward",
+     "expected_behavior": "backward",
+     "effect": "induce",
+     "verdict": "consistent",
+     "reason": "observed behaviour matches",
+     "informative": true
+    }
+   ],
+   "gt_id": "gt01_mdn_activate_backward",
+   "verdict": "consistent",
+   "runtimes_s": {
+    "brain": 2.794,
+    "body": 4.28,
+    "total": 7.08
+   },
+   "video": "assets/embodied/MDN_bilateral.mp4",
+   "note": "MDN_R fires above MDN_L in the brain model, but MDN asymmetry is not mapped to turning; the heading drift comes from the reversed-kinematics backward gait of the body model.",
+   "body_seed_robustness": {
+    "phase_noise_rad": 0.5,
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "backward",
+     "backward",
+     "backward"
+    ],
+    "fraction_same_as_main": 1.0
+   }
+  },
+  {
+   "condition": "P9_bilateral",
+   "stimulus_groups": [
+    "P9"
+   ],
+   "silenced_groups": [],
+   "key_group_rates_hz": {
+    "P9_L": 164.667,
+    "P9_R": 148.333,
+    "MDN_L": 0.0,
+    "MDN_R": 0.0,
+    "DNa02_L": 10.667,
+    "DNa02_R": 24.667,
+    "DNa01_L": 0.0,
+    "DNa01_R": 0.0,
+    "GF_L": 0.0,
+    "GF_R": 0.0,
+    "MN9_L": 0.0,
+    "MN9_R": 0.0,
+    "aDN1_shiu2024": 0.0,
+    "aDN2_shiu2024": 0.0
+   },
+   "n_active_neurons": 150,
+   "drive": {
+    "forward": 1.0,
+    "turn": 0.0944,
+    "backward": 0.0
+   },
+   "behavior": "forward",
+   "body_metrics": {
+    "behavior": "forward",
+    "forward_disp_mm": 13.569,
+    "lateral_disp_mm": -4.39,
+    "heading_change_deg": -26.01,
+    "yaw_rate_deg_s": -26.01,
+    "net_speed_mm_s": 14.262,
+    "mean_speed_mm_s": 17.974,
+    "fell_over": false,
+    "warnings": null,
+    "descending_signal": [
+     1.2,
+     0.993
+    ],
+    "runtime_s": 4.31,
+    "control_every": 5
+   },
+   "brain_readouts": {
+    "escape": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "GF_L": 0.0,
+      "GF_R": 0.0
+     }
+    },
+    "feed": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "MN9_L": 0.0,
+      "MN9_R": 0.0
+     }
+    },
+    "groom": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "aDN1_shiu2024": 0.0,
+      "aDN2_shiu2024": 0.0
+     }
+    }
+   },
+   "checks": [
+    {
+     "gt_id": "gt03_p9_activate_forward",
+     "comparison": "body behavior",
+     "observed": "forward",
+     "expected_behavior": "forward",
+     "effect": "induce",
+     "verdict": "consistent",
+     "reason": "observed behaviour matches",
+     "informative": true
+    }
+   ],
+   "gt_id": "gt03_p9_activate_forward",
+   "verdict": "consistent",
+   "runtimes_s": {
+    "brain": 3.134,
+    "body": 4.31,
+    "total": 7.45
+   },
+   "video": "assets/embodied/P9_bilateral.mp4",
+   "note": "P9 recruits DNa02 (R > L) via the connectome -> small rightward turn term; label stays forward.",
+   "body_seed_robustness": {
+    "phase_noise_rad": 0.5,
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "forward",
+     "forward",
+     "forward"
+    ],
+    "fraction_same_as_main": 1.0
+   }
+  },
+  {
+   "condition": "P9_L",
+   "stimulus_groups": [
+    "P9_L"
+   ],
+   "silenced_groups": [],
+   "key_group_rates_hz": {
+    "P9_L": 146.333,
+    "P9_R": 0.0,
+    "MDN_L": 0.0,
+    "MDN_R": 0.0,
+    "DNa02_L": 18.667,
+    "DNa02_R": 0.0,
+    "DNa01_L": 0.0,
+    "DNa01_R": 0.0,
+    "GF_L": 0.0,
+    "GF_R": 0.0,
+    "MN9_L": 0.0,
+    "MN9_R": 0.0,
+    "aDN1_shiu2024": 0.0,
+    "aDN2_shiu2024": 0.0
+   },
+   "n_active_neurons": 27,
+   "drive": {
+    "forward": 0.4934,
+    "turn": -0.6192,
+    "backward": 0.0
+   },
+   "behavior": "turn_left",
+   "body_metrics": {
+    "behavior": "turn_left",
+    "forward_disp_mm": -0.39,
+    "lateral_disp_mm": 4.061,
+    "heading_change_deg": 186.45,
+    "yaw_rate_deg_s": 186.45,
+    "net_speed_mm_s": 4.08,
+    "mean_speed_mm_s": 11.263,
+    "fell_over": false,
+    "warnings": null,
+    "descending_signal": [
+     -0.1357,
+     1.2
+    ],
+    "runtime_s": 4.62,
+    "control_every": 5
+   },
+   "brain_readouts": {
+    "escape": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "GF_L": 0.0,
+      "GF_R": 0.0
+     }
+    },
+    "feed": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "MN9_L": 0.0,
+      "MN9_R": 0.0
+     }
+    },
+    "groom": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "aDN1_shiu2024": 0.0,
+      "aDN2_shiu2024": 0.0
+     }
+    }
+   },
+   "checks": [
+    {
+     "gt_id": "gt04_p9L_activate_turn_left",
+     "comparison": "body behavior",
+     "observed": "turn_left",
+     "expected_behavior": "turn_left",
+     "effect": "induce",
+     "verdict": "consistent",
+     "reason": "observed behaviour matches",
+     "informative": true
+    }
+   ],
+   "gt_id": "gt04_p9L_activate_turn_left",
+   "verdict": "consistent",
+   "runtimes_s": {
+    "brain": 2.664,
+    "body": 4.62,
+    "total": 7.29
+   },
+   "video": "assets/embodied/P9_L.mp4",
+   "note": "Turn direction matches (ipsilateral, recruited DNa02_L adds to it), but with forward 0.49 and turn -0.62 the body turns almost in place (net forward displacement ~0 mm): the 'forward walking' part of 'forward walking with ipsilateral turning' (Bidaye et al. 2020) is not reproduced by this mapping.",
+   "body_seed_robustness": {
+    "phase_noise_rad": 0.5,
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "turn_left",
+     "turn_left",
+     "turn_left"
+    ],
+    "fraction_same_as_main": 1.0
+   }
+  },
+  {
+   "condition": "DNa02_L",
+   "stimulus_groups": [
+    "DNa02_L"
+   ],
+   "silenced_groups": [],
+   "key_group_rates_hz": {
+    "P9_L": 0.0,
+    "P9_R": 0.0,
+    "MDN_L": 0.0,
+    "MDN_R": 0.0,
+    "DNa02_L": 146.333,
+    "DNa02_R": 0.0,
+    "DNa01_L": 0.0,
+    "DNa01_R": 0.0,
+    "GF_L": 0.0,
+    "GF_R": 0.0,
+    "MN9_L": 0.0,
+    "MN9_R": 0.0,
+    "aDN1_shiu2024": 0.0,
+    "aDN2_shiu2024": 0.0
+   },
+   "n_active_neurons": 11,
+   "drive": {
+    "forward": 0.0,
+    "turn": -0.9867,
+    "backward": 0.0
+   },
+   "behavior": "turn_left",
+   "body_metrics": {
+    "behavior": "turn_left",
+    "forward_disp_mm": -0.472,
+    "lateral_disp_mm": -0.108,
+    "heading_change_deg": 318.27,
+    "yaw_rate_deg_s": 318.27,
+    "net_speed_mm_s": 0.484,
+    "mean_speed_mm_s": 12.968,
+    "fell_over": false,
+    "warnings": null,
+    "descending_signal": [
+     -1.184,
+     1.184
+    ],
+    "runtime_s": 4.65,
+    "control_every": 5
+   },
+   "brain_readouts": {
+    "escape": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "GF_L": 0.0,
+      "GF_R": 0.0
+     }
+    },
+    "feed": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "MN9_L": 0.0,
+      "MN9_R": 0.0
+     }
+    },
+    "groom": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "aDN1_shiu2024": 0.0,
+      "aDN2_shiu2024": 0.0
+     }
+    }
+   },
+   "checks": [
+    {
+     "gt_id": "gt05_dna02L_activate_turn_left",
+     "comparison": "body behavior",
+     "observed": "turn_left",
+     "expected_behavior": "turn_left",
+     "effect": "induce",
+     "verdict": "consistent",
+     "reason": "observed behaviour matches",
+     "informative": true
+    }
+   ],
+   "gt_id": "gt05_dna02L_activate_turn_left",
+   "verdict": "consistent",
+   "runtimes_s": {
+    "brain": 2.727,
+    "body": 4.65,
+    "total": 7.38
+   },
+   "video": "assets/embodied/DNa02_L.mp4",
+   "note": "Steering DN alone, no locomotor DN active -> turning in place. Rayshubskiy et al. tested walking flies.",
+   "body_seed_robustness": {
+    "phase_noise_rad": 0.5,
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "turn_left",
+     "turn_left",
+     "turn_left"
+    ],
+    "fraction_same_as_main": 1.0
+   }
+  },
+  {
+   "condition": "DNa02_R",
+   "stimulus_groups": [
+    "DNa02_R"
+   ],
+   "silenced_groups": [],
+   "key_group_rates_hz": {
+    "P9_L": 0.0,
+    "P9_R": 0.0,
+    "MDN_L": 0.0,
+    "MDN_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 146.333,
+    "DNa01_L": 0.0,
+    "DNa01_R": 0.0,
+    "GF_L": 0.0,
+    "GF_R": 0.0,
+    "MN9_L": 0.0,
+    "MN9_R": 0.0,
+    "aDN1_shiu2024": 0.0,
+    "aDN2_shiu2024": 0.0
+   },
+   "n_active_neurons": 10,
+   "drive": {
+    "forward": 0.0,
+    "turn": 0.9867,
+    "backward": 0.0
+   },
+   "behavior": "turn_right",
+   "body_metrics": {
+    "behavior": "turn_right",
+    "forward_disp_mm": 0.349,
+    "lateral_disp_mm": 0.055,
+    "heading_change_deg": -328.3,
+    "yaw_rate_deg_s": -328.3,
+    "net_speed_mm_s": 0.353,
+    "mean_speed_mm_s": 12.958,
+    "fell_over": false,
+    "warnings": null,
+    "descending_signal": [
+     1.184,
+     -1.184
+    ],
+    "runtime_s": 4.76,
+    "control_every": 5
+   },
+   "brain_readouts": {
+    "escape": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "GF_L": 0.0,
+      "GF_R": 0.0
+     }
+    },
+    "feed": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "MN9_L": 0.0,
+      "MN9_R": 0.0
+     }
+    },
+    "groom": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "aDN1_shiu2024": 0.0,
+      "aDN2_shiu2024": 0.0
+     }
+    }
+   },
+   "checks": [
+    {
+     "gt_id": "gt06_dna02R_activate_turn_right",
+     "comparison": "body behavior",
+     "observed": "turn_right",
+     "expected_behavior": "turn_right",
+     "effect": "induce",
+     "verdict": "consistent",
+     "reason": "observed behaviour matches",
+     "informative": true
+    }
+   ],
+   "gt_id": "gt06_dna02R_activate_turn_right",
+   "verdict": "consistent",
+   "runtimes_s": {
+    "brain": 2.782,
+    "body": 4.76,
+    "total": 7.55
+   },
+   "video": "assets/embodied/DNa02_R.mp4",
+   "note": "Steering DN alone, no locomotor DN active -> turning in place. Rayshubskiy et al. tested walking flies.",
+   "body_seed_robustness": {
+    "phase_noise_rad": 0.5,
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "turn_right",
+     "turn_right",
+     "turn_right"
+    ],
+    "fraction_same_as_main": 1.0
+   }
+  },
+  {
+   "condition": "LPLC2_bilateral",
+   "stimulus_groups": [
+    "LPLC2"
+   ],
+   "silenced_groups": [],
+   "key_group_rates_hz": {
+    "P9_L": 0.0,
+    "P9_R": 0.0,
+    "MDN_L": 0.0,
+    "MDN_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0,
+    "DNa01_L": 1.0,
+    "DNa01_R": 0.0,
+    "GF_L": 152.0,
+    "GF_R": 169.0,
+    "MN9_L": 0.0,
+    "MN9_R": 0.0,
+    "aDN1_shiu2024": 0.0,
+    "aDN2_shiu2024": 0.0
+   },
+   "n_active_neurons": 1121,
+   "drive": {
+    "forward": 0.0,
+    "turn": -0.0034,
+    "backward": 0.0
+   },
+   "behavior": "stop",
+   "body_metrics": {
+    "behavior": "stop",
+    "forward_disp_mm": 0.033,
+    "lateral_disp_mm": 0.008,
+    "heading_change_deg": 0.22,
+    "yaw_rate_deg_s": 0.22,
+    "net_speed_mm_s": 0.034,
+    "mean_speed_mm_s": 0.103,
+    "fell_over": false,
+    "warnings": null,
+    "descending_signal": [
+     0.0,
+     0.0
+    ],
+    "runtime_s": 4.44,
+    "control_every": 5
+   },
+   "brain_readouts": {
+    "escape": {
+     "rate_hz": 169.0,
+     "active": true,
+     "rates_hz": {
+      "GF_L": 152.0,
+      "GF_R": 169.0
+     }
+    },
+    "feed": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "MN9_L": 0.0,
+      "MN9_R": 0.0
+     }
+    },
+    "groom": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "aDN1_shiu2024": 0.0,
+      "aDN2_shiu2024": 0.0
+     }
+    }
+   },
+   "checks": [
+    {
+     "gt_id": "gt19_lplc2_activate_backward",
+     "comparison": "body behavior",
+     "observed": "stop",
+     "expected_behavior": "backward",
+     "effect": "induce",
+     "verdict": "inconsistent",
+     "reason": "expected backward, observed stop",
+     "informative": true
+    },
+    {
+     "gt_id": "gt08_lplc2_activate_escape",
+     "comparison": "brain readout",
+     "observed": "escape",
+     "expected_behavior": "escape",
+     "effect": "induce",
+     "verdict": "consistent",
+     "reason": "observed behaviour matches",
+     "informative": true
+    }
+   ],
+   "gt_id": "gt19_lplc2_activate_backward",
+   "verdict": "inconsistent",
+   "runtimes_s": {
+    "brain": 6.472,
+    "body": 4.44,
+    "total": 10.93
+   },
+   "video": "assets/embodied/LPLC2_bilateral.mp4",
+   "note": "Natural upstream (visual looming) stimulus. In the brain model LPLC2 drives the giant fiber strongly but MDN stays at 0 Hz, so the body does not walk backward. Wu et al. 2016 report jumping and backward walking with about equal penetrance: the escape half is reproduced, the backward half is not. Unverified hypothesis: the backward component uses DNs other than MDN/P9/DNa01/DNa02 or pathways outside the brain connectome (VNC).",
+   "body_seed_robustness": {
+    "phase_noise_rad": 0.5,
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "stop",
+     "stop",
+     "stop"
+    ],
+    "fraction_same_as_main": 1.0
+   }
+  },
+  {
+   "condition": "LPLC2_MDN_silenced",
+   "stimulus_groups": [
+    "LPLC2"
+   ],
+   "silenced_groups": [
+    "MDN"
+   ],
+   "key_group_rates_hz": {
+    "P9_L": 0.0,
+    "P9_R": 0.0,
+    "MDN_L": 0.0,
+    "MDN_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0,
+    "DNa01_L": 1.0,
+    "DNa01_R": 0.0,
+    "GF_L": 152.0,
+    "GF_R": 169.0,
+    "MN9_L": 0.0,
+    "MN9_R": 0.0,
+    "aDN1_shiu2024": 0.0,
+    "aDN2_shiu2024": 0.0
+   },
+   "n_active_neurons": 1121,
+   "drive": {
+    "forward": 0.0,
+    "turn": -0.0034,
+    "backward": 0.0
+   },
+   "behavior": "stop",
+   "body_metrics": {
+    "behavior": "stop",
+    "forward_disp_mm": 0.033,
+    "lateral_disp_mm": 0.008,
+    "heading_change_deg": 0.22,
+    "yaw_rate_deg_s": 0.22,
+    "net_speed_mm_s": 0.034,
+    "mean_speed_mm_s": 0.103,
+    "fell_over": false,
+    "warnings": null,
+    "descending_signal": [
+     0.0,
+     0.0
+    ],
+    "runtime_s": 4.36,
+    "control_every": 5
+   },
+   "brain_readouts": {
+    "escape": {
+     "rate_hz": 169.0,
+     "active": true,
+     "rates_hz": {
+      "GF_L": 152.0,
+      "GF_R": 169.0
+     }
+    },
+    "feed": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "MN9_L": 0.0,
+      "MN9_R": 0.0
+     }
+    },
+    "groom": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "aDN1_shiu2024": 0.0,
+      "aDN2_shiu2024": 0.0
+     }
+    }
+   },
+   "checks": [
+    {
+     "gt_id": "gt02_mdn_silence_backward",
+     "comparison": "body behavior",
+     "observed": "stop",
+     "expected_behavior": "backward",
+     "effect": "reduce",
+     "verdict": "inconclusive",
+     "reason": "backward absent as predicted (observed stop); INCONCLUSIVE: the unsilenced control did not show backward either, so a reduction cannot be tested",
+     "informative": false,
+     "control_condition": "LPLC2_bilateral",
+     "control_behavior": "stop",
+     "raw_verdict": "consistent"
+    }
+   ],
+   "gt_id": "gt02_mdn_silence_backward",
+   "verdict": "inconclusive",
+   "runtimes_s": {
+    "brain": 5.883,
+    "body": 4.36,
+    "total": 10.25
+   },
+   "video": "assets/embodied/LPLC2_MDN_silenced.mp4",
+   "note": "Silencing control for MDN. Uninformative here: MDN was already at 0 Hz without silencing, so the check is reported as 'inconclusive' (raw verdict kept) and excluded from the hit rate.",
+   "body_seed_robustness": {
+    "phase_noise_rad": 0.5,
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "stop",
+     "stop",
+     "stop"
+    ],
+    "fraction_same_as_main": 1.0
+   }
+  },
+  {
+   "condition": "sugar_GRN",
+   "stimulus_groups": [
+    "sugar_GRN_shiu2024"
+   ],
+   "silenced_groups": [],
+   "key_group_rates_hz": {
+    "P9_L": 0.0,
+    "P9_R": 0.0,
+    "MDN_L": 0.0,
+    "MDN_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0,
+    "DNa01_L": 0.0,
+    "DNa01_R": 0.0,
+    "GF_L": 0.0,
+    "GF_R": 0.0,
+    "MN9_L": 59.667,
+    "MN9_R": 80.0,
+    "aDN1_shiu2024": 0.0,
+    "aDN2_shiu2024": 0.0
+   },
+   "n_active_neurons": 387,
+   "drive": {
+    "forward": 0.0,
+    "turn": 0.0,
+    "backward": 0.0
+   },
+   "behavior": "stop",
+   "body_metrics": {
+    "behavior": "stop",
+    "forward_disp_mm": 0.033,
+    "lateral_disp_mm": 0.008,
+    "heading_change_deg": 0.22,
+    "yaw_rate_deg_s": 0.22,
+    "net_speed_mm_s": 0.034,
+    "mean_speed_mm_s": 0.103,
+    "fell_over": false,
+    "warnings": null,
+    "descending_signal": [
+     0.0,
+     0.0
+    ],
+    "runtime_s": 4.56,
+    "control_every": 5
+   },
+   "brain_readouts": {
+    "escape": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "GF_L": 0.0,
+      "GF_R": 0.0
+     }
+    },
+    "feed": {
+     "rate_hz": 80.0,
+     "active": true,
+     "rates_hz": {
+      "MN9_L": 59.667,
+      "MN9_R": 80.0
+     }
+    },
+    "groom": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "aDN1_shiu2024": 0.0,
+      "aDN2_shiu2024": 0.0
+     }
+    }
+   },
+   "checks": [
+    {
+     "gt_id": "gt10_sugar_activate_feed",
+     "comparison": "brain readout",
+     "observed": "feed",
+     "expected_behavior": "feed",
+     "effect": "induce",
+     "verdict": "consistent",
+     "reason": "observed behaviour matches",
+     "informative": true
+    }
+   ],
+   "gt_id": "gt10_sugar_activate_feed",
+   "verdict": "consistent",
+   "runtimes_s": {
+    "brain": 4.061,
+    "body": 4.56,
+    "total": 8.63
+   },
+   "video": "assets/embodied/sugar_GRN.mp4",
+   "body_seed_robustness": {
+    "phase_noise_rad": 0.5,
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "stop",
+     "stop",
+     "stop"
+    ],
+    "fraction_same_as_main": 1.0
+   }
+  },
+  {
+   "condition": "JO_CE",
+   "stimulus_groups": [
+    "JO_CE_shiu2024"
+   ],
+   "silenced_groups": [],
+   "key_group_rates_hz": {
+    "P9_L": 0.0,
+    "P9_R": 0.0,
+    "MDN_L": 0.0,
+    "MDN_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0,
+    "DNa01_L": 0.0,
+    "DNa01_R": 0.0,
+    "GF_L": 0.0,
+    "GF_R": 0.0,
+    "MN9_L": 0.0,
+    "MN9_R": 0.0,
+    "aDN1_shiu2024": 13.0,
+    "aDN2_shiu2024": 19.0
+   },
+   "n_active_neurons": 344,
+   "drive": {
+    "forward": 0.0,
+    "turn": 0.0,
+    "backward": 0.0
+   },
+   "behavior": "stop",
+   "body_metrics": {
+    "behavior": "stop",
+    "forward_disp_mm": 0.033,
+    "lateral_disp_mm": 0.008,
+    "heading_change_deg": 0.22,
+    "yaw_rate_deg_s": 0.22,
+    "net_speed_mm_s": 0.034,
+    "mean_speed_mm_s": 0.103,
+    "fell_over": false,
+    "warnings": null,
+    "descending_signal": [
+     0.0,
+     0.0
+    ],
+    "runtime_s": 4.56,
+    "control_every": 5
+   },
+   "brain_readouts": {
+    "escape": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "GF_L": 0.0,
+      "GF_R": 0.0
+     }
+    },
+    "feed": {
+     "rate_hz": 0.0,
+     "active": false,
+     "rates_hz": {
+      "MN9_L": 0.0,
+      "MN9_R": 0.0
+     }
+    },
+    "groom": {
+     "rate_hz": 19.0,
+     "active": true,
+     "rates_hz": {
+      "aDN1_shiu2024": 13.0,
+      "aDN2_shiu2024": 19.0
+     }
+    }
+   },
+   "checks": [
+    {
+     "gt_id": "gt14_jo_activate_groom",
+     "comparison": "brain readout",
+     "observed": "groom",
+     "expected_behavior": "groom",
+     "effect": "induce",
+     "verdict": "consistent",
+     "reason": "observed behaviour matches",
+     "informative": true
+    }
+   ],
+   "gt_id": "gt14_jo_activate_groom",
+   "verdict": "consistent",
+   "runtimes_s": {
+    "brain": 4.76,
+    "body": 4.56,
+    "total": 9.33
+   },
+   "video": "assets/embodied/JO_CE.mp4",
+   "body_seed_robustness": {
+    "phase_noise_rad": 0.5,
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "stop",
+     "stop",
+     "stop"
+    ],
+    "fraction_same_as_main": 1.0
+   }
+  }
+ ],
+ "summary": {
+  "n_checks": 10,
+  "n_comparable": 9,
+  "n_consistent": 8,
+  "n_inconclusive": 1,
+  "hit_rate": 0.889,
+  "hit_rate_note": "consistent / comparable; not_comparable and inconclusive checks excluded",
+  "readout_specificity": {
+   "escape": {
+    "active_in": [
+     "LPLC2_bilateral",
+     "LPLC2_MDN_silenced"
+    ],
+    "unexpected_active_in": [],
+    "n_conditions": 10
+   },
+   "feed": {
+    "active_in": [
+     "sugar_GRN"
+    ],
+    "unexpected_active_in": [],
+    "n_conditions": 10
+   },
+   "groom": {
+    "active_in": [
+     "JO_CE"
+    ],
+    "unexpected_active_in": [],
+    "n_conditions": 10
+   }
+  },
+  "n_informative": 9,
+  "n_consistent_informative": 8,
+  "hit_rate_informative": 0.889,
+  "by_comparison": {
+   "body behavior": {
+    "n": 6,
+    "consistent": 5
+   },
+   "brain readout": {
+    "n": 3,
+    "consistent": 3
+   }
+  },
+  "verdicts": {
+   "gt01_mdn_activate_backward": "consistent",
+   "gt03_p9_activate_forward": "consistent",
+   "gt04_p9L_activate_turn_left": "consistent",
+   "gt05_dna02L_activate_turn_left": "consistent",
+   "gt06_dna02R_activate_turn_right": "consistent",
+   "gt19_lplc2_activate_backward": "inconsistent",
+   "gt08_lplc2_activate_escape": "consistent",
+   "gt02_mdn_silence_backward": "inconclusive",
+   "gt10_sugar_activate_feed": "consistent",
+   "gt14_jo_activate_groom": "consistent"
+  },
+  "total_wall_s": 119.1
+ }
+}

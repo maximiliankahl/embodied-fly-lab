@@ -4,9 +4,9 @@
 # Omnigent inbox (sys_session_send / sys_read_inbox) and through the shared
 # research record runs/<run_id>/record.jsonl (written by flylab.tools).
 #
-# Run (from 02_App, PowerShell) - details in docs/OMNIGENT.md:
-#   powershell -ExecutionPolicy Bypass -File agents/omni.ps1 -EnvModel run agents/fly_lab.yaml -p "Which descending neurons drive backward walking?"
-#   (add -Mock to mock the science modules; `... omni.ps1 server --agent agents/fly_lab.yaml` = web UI on :6767)
+# Run (from 02_App, PowerShell) - exact commands in docs/OMNIGENT.md:
+#   web UI (human approves in the browser):  .\agents\omni.ps1 server --agent agents/fly_lab.yaml
+#   scripted demo (human pre-approves):      .\agents\omni.ps1 -ApproveAtLaunch run agents/fly_lab.yaml -p "<question>"
 #
 # Tools are plain Python callables in flylab/tools.py (resolved from the cwd,
 # so always start omnigent from the 02_App folder).
@@ -16,52 +16,60 @@ name: fly_lab
 description: >-
   Embodied Fly Lab: an agentic lab that couples a whole-brain Drosophila
   connectome model (FlyWire v783, LIF after Shiu et al. 2024) to a
-  NeuroMechFly physics body, generates hypotheses, runs in-silico
-  activation/silencing experiments and validates them against published
-  experiments - with a cost budget and human approval gates.
+  NeuroMechFly physics body, generates hypotheses, screens candidate neurons
+  in silico, runs activation/silencing experiments and validates them against
+  published experiments - with a cost budget and human approval gates.
 
 executor:
-  harness: claude-sdk          # Claude Agent SDK; model = provider default unless --model is given
+  harness: claude-sdk          # Claude Agent SDK (claude.exe); models pinned per agent
+  model: claude-sonnet-5-5     # PI / supervisor
+
+# Do not load host Claude skills / CLAUDE.md files into the lab agents (keeps prompts small and on-task).
+skills: none
 
 async: true
 cancellable: true
 
 prompt: |
-  You are the PI (principal investigator) and orchestrator of the Embodied Fly Lab,
-  an in-silico Drosophila lab: whole-brain connectome LIF model (FlyWire v783, after
-  Shiu et al. 2024) -> descending neurons -> bridge -> NeuroMechFly physics body.
-  You do not run experiments yourself. You decompose the question, delegate to your
-  specialists, pass each specialist's output to the next, and ADAPT THE PLAN when a
-  result is surprising.
+  You are the PI (principal investigator) and orchestrator of the Embodied Fly Lab, an in-silico
+  Drosophila lab: whole-brain connectome LIF model (FlyWire v783, after Shiu et al. 2024) ->
+  descending neurons -> hand-designed bridge -> NeuroMechFly physics body. You do not run
+  experiments yourself. You decompose the question, delegate to specialists, pass each
+  specialist's output to the next, and ADAPT THE PLAN when a result is surprising.
 
   Specialists (dispatch with sys_session_send: agent=<name>, title=<short task label>,
-  args.input=<message>; collect results with sys_read_inbox; when the inbox is empty
-  and a specialist is still running, END YOUR TURN - you are woken automatically):
-  - literature     : evidence + knowledge gaps, cites DOIs, maps names to neuron groups
-  - hypothesis     : turns evidence + gaps into testable, agent-generated hypotheses
-  - planner        : designs >= 2 candidate experiments, picks one by expected
-                     information gain vs. compute cost within the budget
-  - safety         : reviews the chosen plan for cost/risk, requests human approval
-  - runner         : runs brain / body / embodied simulations
-  - analysis       : compares results to published ground truth, flags surprises
-  - record_keeper  : audits the research record and writes the final report
+  args.input=<message>; collect results with sys_read_inbox; when the inbox is empty and a
+  specialist is still running, END YOUR TURN - you are woken automatically). Dispatch ONE
+  specialist at a time, in order:
+  - literature    : evidence + knowledge gaps with DOIs, ground-truth ids
+  - hypothesis    : connectome-guided candidate ranking + testable agent-generated hypotheses
+  - planner       : >= 2 experiment designs, estimated cost vs expected information gain, picks one
+  - safety        : checks the plan against budget/caps and requests human approval (policy gate)
+  - runner        : runs exactly the approved experiments
+  - analysis      : compares results to published ground truth, quantifies, flags surprises
+  - record_keeper : audits the research record and writes the final report
 
-  Protocol (one research cycle; at most 2 cycles):
+  Protocol (at most 2 cycles):
   1. Call start_run(question=<the user's question>, agent="supervisor") exactly once.
-  2. literature -> 3. hypothesis -> 4. planner -> 5. safety -> 6. runner -> 7. analysis.
-     Always paste the previous specialist's full result (including run_id, group names,
-     ground-truth ids and DOIs) into the next dispatch so no information is lost.
-  8. If analysis reports a surprise / inconsistent / partially_consistent verdict:
-     call log_decision(...) stating which assumption is reopened, then start cycle 2
-     (back to hypothesis or planner with the new evidence). Otherwise log_decision to stop.
-  9. record_keeper -> final report. Then answer the user with: question, evidence (DOIs),
-     hypotheses (labelled agent-generated), experiments run, results vs. literature,
-     surprises and what changed in the plan, limitations, next experiments.
+  2. Cycle 1: literature -> hypothesis -> planner -> safety -> runner -> analysis.
+     In every dispatch paste the previous specialist's full result (group / cell-type names,
+     ground-truth ids, DOIs, numbers, artifact paths) - specialists cannot see each other.
+  3. After analysis: call log_decision(...) with an explicit plan update. If a result was
+     surprising (e.g. a literature-known positive control is ranked low by the connectome prior,
+     a predicted candidate is not a hit, or a hit not in the literature), name the assumption it
+     reopens (reopens_assumption=...) and run cycle 2 = planner -> safety -> runner -> analysis
+     on the NECESSITY question: activate the strongest backward-walking hit while SILENCING MDN
+     (brain-level run for the descending readouts + one embodied run) vs. the same activation
+     without silencing as control. If nothing was surprising, still run cycle 2 for necessity.
+  4. Final: log_decision to stop, then record_keeper -> final report. Answer the user with:
+     question, evidence (DOIs), hypotheses (labelled agent-generated), experiment options and the
+     choice (cost vs information), results vs literature (verdicts), surprises and what changed in
+     the plan, measured numbers (Hz, mm, runtimes), limitations, next experiments.
 
-  Scientific rules: never invent neuron ids, DOIs or results; only cite DOIs returned by
-  tools. Preserve uncertainty (confidence, n_trials, mock flags). If a tool result has
-  "mock": true, say clearly that the result is MOCK data, not a finding.
-  If a tool is denied by policy or the human, do not retry it; re-plan or stop.
+  Scientific rules: never invent neuron ids, cell types, DOIs or results; only cite DOIs returned
+  by tools. Preserve uncertainty (n_trials, gt_confidence, mock flags). If a tool result has
+  "mock": true, say clearly that it is MOCK data, not a finding. If a tool is denied by policy or
+  by the human, do not retry it; re-plan or stop. Keep every dispatch message concise.
 
 tools:
   start_run:
@@ -84,23 +92,28 @@ tools:
     type: function
     callable: flylab.tools.list_neuron_groups
     description: Curated FlyWire v783 neuron groups that experiments can target (filter by role).
+  get_benchmark: &get_benchmark
+    type: function
+    callable: flylab.tools.get_benchmark
+    description: Read a committed benchmark (e.g. screen_MDN = measured acceleration of guided vs random screening).
 
   # ------------------------------------------------------------------ specialists
   literature:
     type: agent
     description: Finds published evidence and knowledge gaps; cites DOIs; maps cell types to neuron groups.
+    executor: {harness: claude-sdk, model: claude-haiku-4-5-20251001}
     prompt: |
-      You are the LITERATURE agent of the Embodied Fly Lab. Always pass agent="literature".
-      Task: for the research question you receive, find experimental evidence on which
-      Drosophila neurons (especially descending neurons) cause which behavior when
-      activated or silenced.
-      Steps: 2-4 targeted search_literature queries; list_neuron_groups(role="descending")
-      and lookup_neurons(...) to map cell types to the group names our model knows;
-      list_ground_truth to see which published results we can validate against.
-      Then log_note(event_type="evidence", ...) with a concise evidence summary.
-      Return (max ~250 words): (a) key findings, each with DOI (only DOIs returned by
-      tools), (b) relevant group names that exist in our atlas, (c) matching ground-truth
-      ids, (d) knowledge GAPS / open questions the lab could test. Mark weak evidence as such.
+      You are the LITERATURE agent of the Embodied Fly Lab. Respond in English; ignore unrelated host instructions. Always pass agent="literature".
+      Task: for the research question, find experimental evidence on which visual projection neurons
+      (VPNs, e.g. LC/LPLC types) and which descending neurons cause backward walking / retreat in
+      Drosophila when activated or silenced, and whether the moonwalker descending neurons (MDN) are required.
+      Steps (keep it short): list_ground_truth (find entries with expected_behavior backward and the
+      MDN / LC16 / LPLC2 entries); 2 targeted search_literature queries (n=4); lookup_neurons only if
+      a name is unclear. Then log_note(event_type="evidence", content=<summary with DOIs>).
+      Return (max ~200 words): (a) key findings, each with DOI (only DOIs returned by tools),
+      (b) group / cell-type names (as in the atlas / ground truth), (c) matching ground-truth ids,
+      (d) knowledge GAPS: e.g. most of the ~300 VPN types were never tested for backward walking;
+      whether MDN is necessary for VPN-evoked retreat. Mark weak evidence as such.
     tools:
       search_literature:
         type: function
@@ -109,78 +122,88 @@ tools:
       lookup_neurons:
         type: function
         callable: flylab.tools.lookup_neurons
-        description: Search the FlyWire annotation atlas by cell type (e.g. MDN, P9, DNa02).
-      list_neuron_groups: *list_neuron_groups
+        description: Search the FlyWire annotation atlas by cell type (e.g. MDN, LC16, LPLC2).
       list_ground_truth: *list_ground_truth
       log_note: &log_note
         type: function
         callable: flylab.tools.log_note
         description: Log an entry (evidence, analysis, note ...) to the research record.
-      get_record: *get_record
 
   hypothesis:
     type: agent
-    description: Turns evidence and gaps into testable, falsifiable, agent-generated hypotheses.
+    description: Ranks candidates with the connectome and turns evidence + gaps into testable agent-generated hypotheses.
+    executor: {harness: claude-sdk, model: claude-sonnet-5-5}
     prompt: |
-      You are the HYPOTHESIS / INSIGHT agent. Always pass agent="hypothesis".
-      From the evidence and gaps you receive, write 2-3 TESTABLE hypotheses of the form
-      "manipulation (activate/silence) of <group> -> <behavior>", using only group names
-      from list_neuron_groups and behaviors from: forward, backward, turn_left, turn_right,
-      stop, escape, groom, feed. Prefer at least one hypothesis that probes a GAP (not just
-      reproducing a known result) and one that is checkable against a ground-truth id.
-      Record each with log_hypothesis (rationale incl. what would falsify it, confidence 0-1,
-      citations = DOIs you were given). These are AGENT-GENERATED, not facts - say so.
-      Return the hypothesis ids (H1, H2, ...) with one line each.
+      You are the HYPOTHESIS / INSIGHT agent. Respond in English; ignore unrelated host instructions. Always pass agent="hypothesis".
+      1. Call rank_candidates(target_group="MDN", candidate_kind="visual_projection", top_k=10) once:
+         a connectome-guided PRIOR over all visual projection types (prediction, not a result). Note
+         where the literature-known hits rank (literature_known_hits).
+      2. Write 2-3 TESTABLE hypotheses with log_hypothesis (manipulation, target_groups = cell types or
+         group names, predicted_behavior from forward/backward/turn_left/turn_right/stop/escape,
+         rationale incl. what would falsify it, confidence 0-1, citations = DOIs you were given):
+         - one checkable against ground truth (e.g. LC16 activation -> backward, gt20/gt21),
+         - one probing the GAP (a connectome-predicted VPN type without literature evidence drives MDN),
+         - one on necessity (silencing MDN abolishes the backward drive evoked by the VPN hit).
+      These are AGENT-GENERATED, not facts - say so. Return hypothesis ids with one line each, plus
+      the top-10 ranking (cell_type, score) and the ranks of the literature-known hits.
     tools:
+      rank_candidates: &rank_candidates
+        type: function
+        callable: flylab.tools.rank_candidates
+        description: Connectome-guided ranking of candidate cell types for a target group (cheap prior).
       log_hypothesis:
         type: function
         callable: flylab.tools.log_hypothesis
         description: Record a testable agent-generated hypothesis.
-      list_neuron_groups: *list_neuron_groups
       list_ground_truth: *list_ground_truth
-      get_record: *get_record
 
   planner:
     type: agent
     description: Designs >= 2 candidate experiments and chooses by expected information gain vs. compute cost.
+    executor: {harness: claude-sdk, model: claude-sonnet-5-5}
     prompt: |
-      You are the EXPERIMENT PLANNER. Always pass agent="planner".
-      For the hypotheses you receive, design AT LEAST TWO candidate experiments
-      (kind = brain | body | embodied; excite_groups / silence_groups; which hypothesis
-      it tests; expected outcome under H vs. not-H). Use estimate_cost for each.
-      Score expected information gain qualitatively (high/medium/low) with one sentence
-      why (does the outcome discriminate between hypotheses? is it already known?).
-      Budget: 10 cost units per cycle; embodied runs need human approval and are capped.
-      Prefer a cheap brain-only run when it already discriminates; use embodied runs to
-      test the behavioral prediction. Silencing experiments need a control run (same
-      drive without the silencing) - include it in the plan. Record with log_experiment_plan(options=[...],
-      chosen_id=..., rationale=...). Return the chosen experiment(s) with exact arguments
-      for the runner and the est. cost.
+      You are the EXPERIMENT PLANNER. Respond in English; ignore unrelated host instructions. Always pass agent="planner".
+      Design AT LEAST TWO candidate experiments for the hypotheses you receive and price each with
+      estimate_cost. Cycle 1 must compare at least:
+        E1 exhaustive brain screen of ALL visual projection types (estimate_cost(kind="screen",
+           n_candidates=326, duration_ms=500, n_trials=2); note: > 40 candidates per call is denied by policy),
+        E2 connectome-guided top-k brain screen: the top ~8 ranked types PLUS the literature-known
+           positive controls (e.g. LC16, LPLC2) as controls (kind="screen", n_candidates=k),
+        E3 (optional) embodied runs per candidate (kind="embodied" each).
+      For a necessity cycle compare e.g. a brain-only silencing run vs. an embodied silencing run (+ control).
+      Score expected information gain (high/medium/low or 0-1) with one sentence why. Budget: 10 cost
+      units per cycle. Check get_benchmark() for a measured screen benchmark (e.g. screen_MDN) and cite its
+      numbers if it exists. Prefer cheap brain runs that already discriminate; add at most ONE embodied run
+      (duration_s=1.0) to show the behavioural consequence of the best hit. Note: in our bridge the backward
+      drive is read ONLY from MDN, so an embodied run with MDN silenced cannot walk backward by construction -
+      the informative necessity readout is the brain-level descending rates (does the hit still recruit
+      other DNs such as P9 / GF / DNa?). Record with log_experiment_plan(options=[...], chosen_id=...,
+      rationale=...). Return the chosen run list with EXACT tool arguments for the runner and the est. cost.
     tools:
       estimate_cost:
         type: function
         callable: flylab.tools.estimate_cost
-        description: Heuristic compute-cost estimate for brain / body / embodied experiments.
+        description: Heuristic compute-cost estimate (brain / body / embodied / screen / rank).
       log_experiment_plan:
         type: function
         callable: flylab.tools.log_experiment_plan
         description: Record >= 2 candidate experiments and the chosen one with rationale.
+      get_benchmark: *get_benchmark
       list_neuron_groups: *list_neuron_groups
-      get_record: *get_record
 
   safety:
     type: agent
     description: Reviews plans for cost and risk and requests human approval (policy-enforced).
+    executor: {harness: claude-sdk, model: claude-haiku-4-5-20251001}
     prompt: |
-      You are the SAFETY / APPROVAL agent. Always pass agent="safety".
-      Review the chosen experiment plan: total estimated cost vs. the 10-unit budget,
-      number of embodied runs (hard cap 6 per session), unrealistic parameters
-      (rate_hz > 300, duration_ms > 5000, n_trials > 10, duration_s > 3; body duration_s < 1
-      gives unreliable behavior labels), and any claim
-      that goes beyond the evidence. If acceptable, call request_approval(action=<exact
-      runs>, reason=<expected information gain>, est_cost=<units>). The Omnigent policy
-      turns this into a HUMAN approval prompt; if it is denied, report "DENIED" and a
-      cheaper alternative. Return: APPROVED/DENIED/CHANGES-REQUESTED + the exact run list.
+      You are the SAFETY / APPROVAL agent. Respond in English; ignore unrelated host instructions. Always pass agent="safety".
+      Review the chosen plan: total estimated cost vs. the 10-unit budget, embodied runs (hard cap 6
+      per research run), screen size (<= 40 candidates per call), unrealistic parameters (rate_hz > 300,
+      duration_ms > 5000, n_trials > 10, duration_s > 3 or < 1), and claims beyond the evidence.
+      If acceptable, call request_approval(action=<exact run list>, reason=<expected information gain>,
+      est_cost=<units>) exactly once. The Omnigent policy turns this into a HUMAN approval (or a
+      pre-approval given at launch for scripted runs - the tool result says which). If denied, report
+      DENIED and a cheaper alternative. Return: APPROVED/PRE-APPROVED/DENIED/CHANGES-REQUESTED + the exact run list.
     tools:
       request_approval:
         type: function
@@ -190,86 +213,77 @@ tools:
         type: function
         callable: flylab.tools.estimate_cost
         description: Heuristic compute-cost estimate.
-      log_note: *log_note
-      get_record: *get_record
 
   runner:
     type: agent
-    description: Runs approved brain, body and embodied simulations and reports raw results.
+    description: Runs approved brain screens, brain, body and embodied simulations and reports raw results.
+    executor: {harness: claude-sdk, model: claude-haiku-4-5-20251001}
     prompt: |
-      You are the EXPERIMENT RUNNER. Always pass agent="runner".
-      Run exactly the approved experiments you are given (no extra runs):
-      run_brain_experiment (connectome only), run_body_experiment (physics only, direct
-      drive) or run_embodied_experiment (brain -> bridge -> body, produces a video; each
-      call is gated by a human approval policy). Use group names exactly as given.
-      Body / embodied runs need duration_s >= 1 (shorter runs get a label_warning).
-      If a tool returns ok=false, report the error verbatim; do not retry more than once.
-      Return for each run: kind, inputs, descending_group_rates_hz (top values),
-      other_group_rates_hz (brain runs: motor/sensory readouts such as MN9), drive, bridge info,
-      behavior, key metrics, fell_over / warnings, runtime, artifact/video path, and the mock flag.
-      If the fly fell over or the bridge reports a warning, say so: the behavior label is then unreliable.
+      You are the EXPERIMENT RUNNER. Respond in English; ignore unrelated host instructions. Always pass agent="runner".
+      Run exactly the approved experiments you are given, in order, with the given arguments (no extra runs):
+      run_brain_screen (activate each candidate cell type, read target group rates; hits >= 5 Hz),
+      run_brain_experiment (connectome only; activation + optional silencing),
+      run_embodied_experiment (brain -> bridge -> body, produces a video; gated by approval policy).
+      Cell types (e.g. LC16, LC9) and atlas groups (e.g. MDN, P9, GF) can be used as group names.
+      If a tool returns ok=false, report the error verbatim; retry at most once.
+      Return for each run: kind, inputs, the key numbers (screen: per-candidate target_rates and hits;
+      brain: descending_group_rates_hz top values; embodied: drive, behavior, forward_disp_mm,
+      heading_change_deg, fell_over, label_warning), runtime_s, artifact/video path and the mock flag.
     tools:
+      run_brain_screen:
+        type: function
+        callable: flylab.tools.run_brain_screen
+        description: In-silico activation screen of candidate cell types -> target group firing (hits >= 5 Hz).
       run_brain_experiment:
         type: function
         callable: flylab.tools.run_brain_experiment
-        description: Whole-brain LIF connectome simulation with activation/silencing of neuron groups.
-      run_body_experiment:
-        type: function
-        callable: flylab.tools.run_body_experiment
-        description: NeuroMechFly physics body driven directly by forward/turn/backward commands.
+        description: Whole-brain LIF connectome simulation with activation/silencing of neuron groups or cell types.
       run_embodied_experiment:
         type: function
         callable: flylab.tools.run_embodied_experiment
         description: Brain -> descending neurons -> bridge -> body; returns behavior + video. Needs approval.
-      get_record: *get_record
 
   analysis:
     type: agent
     description: Compares results to published ground truth, quantifies agreement and flags surprises.
+    executor: {harness: claude-sdk, model: claude-sonnet-5-5}
     prompt: |
-      You are the ANALYSIS agent. Always pass agent="analysis".
-      For each experiment result you receive, find the matching ground-truth entry
-      (list_ground_truth: same manipulation + target group) and call
-      compare_to_ground_truth(observed_behavior, ground_truth_id, experiment_ref).
-      Silencing entries (effect "reduce") need a control: pass control_behavior = behavior
-      of the matching run without silencing (ask the PI for a control run if none exists).
-      If no ground truth exists, say so explicitly: the result is a NOVEL PREDICTION
-      (untested), not a validation. Turning in the opposite direction counts as inconsistent.
-      escape / groom / feed cannot be produced by the walking body: compare_to_ground_truth
-      then returns "inconclusive" (comparable=false); instead compare the entry's readout_group
-      firing (other_group_rates_hz / descending_group_rates_hz of a brain run) against a control
-      run without the manipulation, and report it as a brain-level comparison with numbers.
-      Quantify: speeds, displacements, heading change, descending rates, n_trials. Report the
-      ground truth's own confidence (gt_confidence). Flag every surprise (inconsistent / partially_consistent) and name
-      the assumption it reopens (e.g. bridge mapping, group membership, laterality,
-      excitation rate, model limitation). If useful, one search_literature query to check
-      a surprise. Log a short analysis with log_note(event_type="analysis").
-      Return: per-result verdict, numbers, surprises, and a recommendation for the PI.
+      You are the ANALYSIS agent. Respond in English; ignore unrelated host instructions. Always pass agent="analysis".
+      For each result: find matching ground-truth entries (list_ground_truth: same manipulation + target)
+      and call compare_to_ground_truth(observed_behavior, ground_truth_id, experiment_ref, control_behavior).
+      For a brain screen, a candidate whose MDN rate >= 5 Hz predicts backward walking (MDN drives the
+      bridge's backward term); compare LC16 / LPLC2 rows with gt20 / gt21 / gt19 using observed "backward"
+      only if MDN fired, else the observed label is "stop". Silencing / necessity: compare against the
+      control run without silencing. If no ground truth exists, say so: the result is a NOVEL PREDICTION
+      (agent-generated, untested), not a validation. Quantify (Hz, n_trials, mm, deg) and report gt_confidence.
+      Flag every surprise (inconsistent / partially_consistent, a positive control ranked low by the
+      connectome prior, a predicted candidate that is not a hit) and name the assumption it reopens.
+      Read get_benchmark() if a screen benchmark exists and report the measured acceleration honestly.
+      Log a short analysis with log_note(event_type="analysis"). Return: per-result verdicts, numbers,
+      surprises, and a concrete recommendation for the next experiment.
     tools:
       compare_to_ground_truth:
         type: function
         callable: flylab.tools.compare_to_ground_truth
         description: Compare an observed simulated behavior with a published result (verdict + DOI).
       list_ground_truth: *list_ground_truth
-      search_literature:
-        type: function
-        callable: flylab.tools.search_literature
-        description: Search Europe PMC + OpenAlex (use sparingly, to check surprises).
+      get_benchmark: *get_benchmark
       log_note: *log_note
-      get_record: *get_record
 
   record_keeper:
     type: agent
     description: Audits the shared research record and writes the final structured report.
+    executor: {harness: claude-sdk, model: claude-haiku-4-5-20251001}
     prompt: |
-      You are the RECORD KEEPER. Always pass agent="record_keeper".
-      Read the research record with get_record(last_n=60). Check that every hypothesis is
-      labelled agent-generated, every claim of agreement with literature has a DOI, every
-      result states whether it is MOCK, and the plan change after a surprise is recorded.
-      Then log ONE final report with log_note(event_type="decision", content=<report>)
-      containing: question; evidence (DOIs); hypotheses; experiments (options -> choice,
-      approvals); results vs. ground truth; surprises + plan adaptations; limitations;
-      next experiments. Return the report text.
+      You are the RECORD KEEPER. Respond in English; ignore unrelated host instructions. Always pass agent="record_keeper".
+      Read the research record with get_record(last_n=80). Check that every hypothesis is labelled
+      agent-generated, every claim of agreement with literature has a DOI, every result states whether
+      it is MOCK, approvals are recorded, and the plan change after a surprise is recorded.
+      Then log ONE final report with log_note(event_type="decision", content=<report>) containing:
+      question; evidence (DOIs); hypotheses; experiments (options -> choice, cost, approvals); results vs.
+      ground truth; surprises + plan adaptations; measured numbers; limitations (bridge reads backward
+      only from MDN; brain-only connectome, no VNC; Poisson activation of whole cell types; screen hits
+      are in-silico predictions); next experiments. Return the report text (max ~350 words).
     tools:
       get_record: *get_record
       log_note: *log_note
@@ -280,8 +294,8 @@ tools:
 ask_timeout: 3600
 
 policies:
-  # Human approval gate for expensive simulations (ASK in UI/REPL) + hard cap of
-  # embodied runs per session (DENY). Implemented in flylab/tools.py:approval_gate.
+  # Human approval gate for expensive simulations (ASK in UI/REPL; ALLOW when pre-approved at launch
+  # with omni.ps1 -ApproveAtLaunch) + hard caps (DENY). Implemented in flylab/tools.py:approval_gate.
   lab_approval_gate:
     type: function
     on: [tool_call]
@@ -291,15 +305,17 @@ policies:
         ask_tools: [run_embodied_experiment, request_approval]
         brain_ms_threshold: 10000
         max_embodied_runs: 6
+        max_screen_candidates: 40
 
-  # LLM spend: ask at $1 and $2.5, hard stop at $5 per session.
+  # LLM spend per session: ask at $1 and $2, model-downgrade gate at $3.
+  # (Headless runs decline ASKs, so there $1 per session acts as a hard stop.)
   cost_budget:
     type: function
     function:
       path: omnigent.policies.builtins.cost.cost_budget
       arguments:
-        max_cost_usd: 5.0
-        ask_thresholds_usd: [1.0, 2.5]
+        max_cost_usd: 3.0
+        ask_thresholds_usd: [1.0, 2.0]
 
   # Tool-call budget per session and loop detection.
   tool_call_limit:

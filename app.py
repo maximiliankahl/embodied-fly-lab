@@ -1,87 +1,71 @@
-"""Hackathon starter: AI chat with Streamlit + Claude.
+"""Embodied Fly Lab - Streamlit dashboard.
 
-Run locally:  uv run streamlit run app.py
+Run locally:   uv run streamlit run app.py
+Replay mode:   set FLYLAB_REPLAY=1 (recorded runs + benchmark files only, no live simulation)
+
+Pages live in flylab/ui_*.py and are imported lazily, so the app starts fast and also
+renders without the simulation stack (flygym, connectome files).
 """
 
-import os
-
-import anthropic
 import streamlit as st
-from dotenv import load_dotenv
 
-load_dotenv()
+st.set_page_config(page_title="Embodied Fly Lab", layout="wide", initial_sidebar_state="expanded")
 
-MODEL = os.getenv("ANTHROPIC_MODEL", "claude-opus-5-5")
-SYSTEM_PROMPT = "You are a helpful assistant in a hackathon demo. Answer clearly and concisely."
+from flylab import ui  # noqa: E402  (light: stdlib + streamlit only)
 
-# Server-side refusal fallback (Claude API): if the model declines, the API retries on a
-# suitable fallback model within the same call. Only these models accept the "default" form.
-FALLBACK_MODELS = {"claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"}
 
-st.set_page_config(page_title="Hackathon Demo", page_icon="🚀")
-st.title("🚀 Hackathon Demo")
-st.caption(f"Model: {MODEL}")
+def _notebook() -> None:
+    from flylab import ui_notebook
 
-if not os.getenv("ANTHROPIC_API_KEY"):
-    st.warning(
-        "No ANTHROPIC_API_KEY found. Copy `.env.example` to `.env`, add your key, "
-        "and restart the app."
+    ui_notebook.page()
+
+
+def _bench() -> None:
+    from flylab import ui_bench
+
+    ui_bench.page()
+
+
+def _validation() -> None:
+    from flylab import ui_validation
+
+    ui_validation.page()
+
+
+def _method() -> None:
+    from flylab import ui_method
+
+    ui_method.page()
+
+
+ui.inject_css()
+nav = st.navigation(
+    [
+        st.Page(_notebook, title="Lab notebook", icon=":material/menu_book:", url_path="notebook", default=True),
+        st.Page(_bench, title="Experiment bench", icon=":material/science:", url_path="bench"),
+        st.Page(_validation, title="Validation & speed", icon=":material/fact_check:", url_path="validation"),
+        st.Page(_method, title="Method & limits", icon=":material/account_tree:", url_path="method"),
+    ]
+)
+
+with st.sidebar:
+    st.markdown("### Embodied Fly Lab")
+    st.caption(
+        "An Omnigent agent lab that runs in-silico activation and silencing experiments on a whole-brain "
+        "Drosophila connectome model (FlyWire v783) coupled to a NeuroMechFly physics body, and checks "
+        "the results against published experiments."
     )
-    st.stop()
+    kr = ui.key_results()
+    if kr:
+        st.markdown("**Key results**")
+        for label, value in kr:
+            st.markdown(f"**{value}** <span class='fl-small'>{label}</span>", unsafe_allow_html=True)
+    replay, reasons = ui.replay_status()
+    if replay:
+        st.markdown(ui.badge("Replay mode", "orange") + " recorded data only")
+        st.caption("; ".join(reasons))
+    else:
+        st.markdown(ui.badge("Live mode", "green") + " simulation stack available")
+    st.caption("Hack-Nation 7 · Databricks challenge: Agentic Scientific Discovery")
 
-client = anthropic.Anthropic()
-
-# `chat` holds plain text for display; `api_messages` holds the full content blocks
-# returned by the API, which must be sent back unchanged on the next turn.
-if "chat" not in st.session_state:
-    st.session_state.chat = []
-    st.session_state.api_messages = []
-
-for msg in st.session_state.chat:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
-if prompt := st.chat_input("Type a message..."):
-    st.session_state.chat.append({"role": "user", "content": prompt})
-    st.session_state.api_messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    fallback_args = (
-        {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
-        if MODEL in FALLBACK_MODELS
-        else {}
-    )
-
-    with st.chat_message("assistant"):
-        try:
-            with client.beta.messages.stream(
-                model=MODEL,
-                max_tokens=64000,
-                system=SYSTEM_PROMPT,
-                messages=st.session_state.api_messages,
-                **fallback_args,
-            ) as stream:
-                answer = st.write_stream(stream.text_stream)
-                final = stream.get_final_message()
-        except anthropic.AuthenticationError:
-            st.error("Invalid API key. Check ANTHROPIC_API_KEY in .env.")
-            st.stop()
-        except anthropic.NotFoundError:
-            st.error(f"Model '{MODEL}' not found. Check ANTHROPIC_MODEL in .env.")
-            st.stop()
-        except anthropic.RateLimitError:
-            st.error("Rate limit reached. Wait a moment and try again.")
-            st.stop()
-        except anthropic.APIStatusError as e:
-            st.error(f"API error {e.status_code}: {e.message}")
-            st.stop()
-        except anthropic.APIConnectionError:
-            st.error("Cannot reach the API. Check your internet connection.")
-            st.stop()
-
-        if final.stop_reason == "refusal":
-            st.info("The model declined this request. Try rephrasing it.")
-
-    st.session_state.chat.append({"role": "assistant", "content": answer})
-    st.session_state.api_messages.append({"role": "assistant", "content": final.content})
+nav.run()

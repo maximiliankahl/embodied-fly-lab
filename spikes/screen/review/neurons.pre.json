@@ -9,7 +9,7 @@
    "10.1038/s41586-025-08925-z"
   ],
   "shiu_model_code": "https://github.com/philshiu/Drosophila_brain_model",
-  "built": "2026-10-04 00:40",
+  "built": "2026-10-04 00:19",
   "notes": [
    "Groups ending in _shiu2024 reuse the exact neuron IDs from the Shiu et al. model code (v630 IDs that persist unchanged in v783).",
    "Left/right: Shiu et al. (v630 era) label the sugar/bitter/water sets 'right hemisphere'; the v783 annotation 'side' for the same IDs is 'left'. We always report the v783 annotation side.",
@@ -4718,8 +4718,7 @@
    "description": "Lobula columnar 4 visual projection neurons; activation evokes jumping (Wu et al. 2016); a visual projection input to the giant fiber escape circuit (von Reyn et al. 2017).",
    "citations": [
     "10.7554/eLife.21022",
-    "10.1016/j.neuron.2017.05.036",
-    "10.1016/j.cub.2019.01.079"
+    "10.1016/j.neuron.2017.05.036"
    ],
    "n": 104,
    "cell_type_counts": {
@@ -4731,7 +4730,7 @@
    ],
    "confidence": {
     "level": "high",
-    "reason": "FlyWire cell_type and hemibrain_type both 'LC4' (super_class visual_projection, 104 neurons). LC4 -> GF: Ache et al. 2019 abstract (verbatim) 'show that LPLC2 and LC4 synapse directly onto the GF' and attributes looming-velocity input to LC4 (their earlier work, von Reyn et al. 2017, whose abstract only says 'a visual projection neuron type')."
+    "reason": "FlyWire cell_type and hemibrain_type both 'LC4' (super_class visual_projection, 104 neurons). That the GF-input type described by von Reyn et al. 2017 is LC4 is stated in the paper body (not open access; not verified verbatim here); the abstract only says 'a visual projection neuron type'."
    },
    "mapping_source": "https://github.com/flyconnectome/flywire_annotations (Supplemental_file1_neuron_annotations.tsv); selector {'cell_type': 'LC4'}",
    "side_convention": "FlyWire v783 annotation 'side' (soma side for brain neurons, nerve-entry side for sensory neurons).",
@@ -4801,8 +4800,7 @@
    "description": "Lobula columnar 4 visual projection neurons; activation evokes jumping (Wu et al. 2016); a visual projection input to the giant fiber escape circuit (von Reyn et al. 2017). (left side only)",
    "citations": [
     "10.7554/eLife.21022",
-    "10.1016/j.neuron.2017.05.036",
-    "10.1016/j.cub.2019.01.079"
+    "10.1016/j.neuron.2017.05.036"
    ],
    "n": 54,
    "cell_type_counts": {
@@ -4813,7 +4811,7 @@
    ],
    "confidence": {
     "level": "high",
-    "reason": "FlyWire cell_type and hemibrain_type both 'LC4' (super_class visual_projection, 104 neurons). LC4 -> GF: Ache et al. 2019 abstract (verbatim) 'show that LPLC2 and LC4 synapse directly onto the GF' and attributes looming-velocity input to LC4 (their earlier work, von Reyn et al. 2017, whose abstract only says 'a visual projection neuron type')."
+    "reason": "FlyWire cell_type and hemibrain_type both 'LC4' (super_class visual_projection, 104 neurons). That the GF-input type described by von Reyn et al. 2017 is LC4 is stated in the paper body (not open access; not verified verbatim here); the abstract only says 'a visual projection neuron type'."
    },
    "mapping_source": "https://github.com/flyconnectome/flywire_annotations (Supplemental_file1_neuron_annotations.tsv); selector {'cell_type': 'LC4'}",
    "side_convention": "FlyWire v783 annotation 'side' (soma side for brain neurons, nerve-entry side for sensory neurons).",
@@ -4879,8 +4877,7 @@
    "description": "Lobula columnar 4 visual projection neurons; activation evokes jumping (Wu et al. 2016); a visual projection input to the giant fiber escape circuit (von Reyn et al. 2017). (right side only)",
    "citations": [
     "10.7554/eLife.21022",
-    "10.1016/j.neuron.2017.05.036",
-    "10.1016/j.cub.2019.01.079"
+    "10.1016/j.neuron.2017.05.036"
    ],
    "n": 50,
    "cell_type_counts": {
@@ -4891,7 +4888,7 @@
    ],
    "confidence": {
     "level": "high",
-    "reason": "FlyWire cell_type and hemibrain_type both 'LC4' (super_class visual_projection, 104 neurons). LC4 -> GF: Ache et al. 2019 abstract (verbatim) 'show that LPLC2 and LC4 synapse directly onto the GF' and attributes looming-velocity input to LC4 (their earlier work, von Reyn et al. 2017, whose abstract only says 'a visual projection neuron type')."
+    "reason": "FlyWire cell_type and hemibrain_type both 'LC4' (super_class visual_projection, 104 neurons). That the GF-input type described by von Reyn et al. 2017 is LC4 is stated in the paper body (not open access; not verified verbatim here); the abstract only says 'a visual projection neuron type'."
    },
    "mapping_source": "https://github.com/flyconnectome/flywire_annotations (Supplemental_file1_neuron_annotations.tsv); selector {'cell_type': 'LC4'}",
    "side_convention": "FlyWire v783 annotation 'side' (soma side for brain neurons, nerve-entry side for sensory neurons).",

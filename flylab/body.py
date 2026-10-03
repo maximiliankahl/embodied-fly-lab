@@ -40,6 +40,12 @@ side of sharp turns). Real backward walking in Drosophila (e.g. moonwalker desce
 neurons, Bidaye et al. 2014) uses different leg kinematics; treat our backward gait as
 a qualitative stand-in only.
 
+Speed / labels (Phase 2): the controller runs every DEFAULT_CONTROL_EVERY = 5 physics
+steps by default (~2.6 s wall per simulated second instead of ~9 s; identical labels in
+32/32 checks, see the DEFAULT_CONTROL_EVERY comment). classify() checks fast, axial
+BACKWARD displacement in the fly's initial frame BEFORE the yaw-rate rule, so wobbly or
+slightly curved backward runs are not mislabelled as turns (see classify()).
+
 Sign conventions (all relative to the fly at t=0, viewed from above, right-handed world
 frame, z up; in NeuroMechFly +x = anterior, +y = fly's LEFT):
 * heading_deg / heading_change_deg: mathematical convention, counter-clockwise
@@ -96,11 +102,35 @@ TURN_RATE_THRESH_DEG_S = 40.0  # |mean yaw rate| above this -> turn_left/turn_ri
 # >= 0.25 s the rate threshold (40 deg/s * 0.25 s = 10 deg) dominates, so no change.
 TURN_MIN_ABS_DEG = 10.0
 STOP_SPEED_THRESH_MM_S = 1.5  # net displacement speed below this -> stop
+# Backward-displacement-first rule (added for robustness, Phase 2): a run whose net
+# displacement is fast, BACKWARD and mostly along the fly's INITIAL body axis, and whose
+# heading changed < 60 deg, is backward walking even if its mean yaw rate exceeds 40 deg/s.
+# Reason: backward walking (reversed kinematics) wobbles/curves in yaw; with phase noise,
+# 1 s MDN-like runs reached |yaw| up to 33 deg/s, and backward runs with a small commanded
+# turn (backward=1, turn=0.1) reach |dH| = 40-46 deg in 1 s while moving ~10 mm back and
+# only ~2-3 mm sideways (spikes/bridge/out/body_check.json). Reviewer changes: (a) the rule
+# is restricted to backward displacement, so forward/turn labels keep the Phase-1 yaw-rate
+# semantics for any run duration; (b) the heading bound was raised from 45 to 60 deg
+# because 45 sat inside the backward_small_turn spread (-40..-46 deg) and flipped labels
+# between seeds and between control_every 1 and 5 (2/32 disagreements); with 60: 32/32.
+# For a constant-curvature arc |lat|/|fwd| = tan(dH/2), so AXIAL_RATIO=2 by itself caps
+# clean arcs at dH ~ 53 deg; the 60-deg bound is a safety net for non-arc trajectories.
+STRAIGHT_MIN_SPEED_MM_S = 3.0  # = 2 x STOP threshold
+STRAIGHT_AXIAL_RATIO = 2.0  # |forward_disp| >= 2 x |lateral_disp|
+STRAIGHT_MAX_HEADING_DEG = 60.0  # |heading change| below this
 # A run counts as straight forward/backward if |net speed| >= STOP_SPEED_THRESH and
 # |yaw rate| < TURN_RATE_THRESH; direction from the sign of forward_disp_mm.
 
 
 DRIVE_KEYS = ("forward", "turn", "backward")
+# Controller every 5 physics steps by default (Phase 2 decision, evidence in
+# spikes/bridge/body_check.py -> spikes/bridge/out/body_check.json): over 8 drives x 4
+# seed/noise settings (1 s each) control_every=5 vs 1 gave 32/32 identical behaviour
+# labels; forward / turn / stop metrics within 0.1 mm and 1.3 deg; backward runs differ
+# by up to 3.3 mm / 20 deg, which is inside the seed-to-seed spread of control_every=1
+# itself (backward heading change -5..+33 deg across seeds); median wall time per
+# simulated second 9.0 s -> 2.6 s (3.5x). Pass control_every=1 for the tutorial setting.
+DEFAULT_CONTROL_EVERY = 5
 MIN_DURATION_S = 0.05  # shorter runs are clamped up (avoids empty trajectories / div by 0)
 MAX_DURATION_S = 10.0  # longer runs are clamped down (1 sim-s costs ~7-25 s wall)
 UPRIGHT_MIN_COS = 0.5  # thorax z-axis . world z below this (tilt > 60 deg) = fell over
@@ -250,7 +280,7 @@ def simulate_walk(
     playback_speed: float = 0.25,
     sample_dt_s: float = SAMPLE_DT_S,
     phase_noise_rad: float = 0.0,
-    control_every: int = 1,
+    control_every: int = DEFAULT_CONTROL_EVERY,
 ) -> dict:
     """Simulate NeuroMechFly walking on flat ground under a constant descending drive.
 
@@ -268,7 +298,8 @@ def simulate_walk(
             tripod initial CPG phases; 0 = deterministic. Use >0 for trial variability.
         control_every: run the (pure-Python, ~80% of runtime) controller only every
             N physics steps (CPG integrated with N*dt, actuator targets held in
-            between). 1 = flygym tutorial setting (default). See spikes/body notes.
+            between). Default DEFAULT_CONTROL_EVERY = 5 (~3.5x faster than the flygym
+            tutorial setting 1; same labels, see DEFAULT_CONTROL_EVERY comment).
 
     Returns the contract dict (see module docstring for sign conventions) plus extras:
         descending_signal, turn_index, yaw_rate_deg_s, net_speed_mm_s, sim_duration_s,
@@ -443,6 +474,10 @@ def classify(metrics: dict) -> str:
     """Map walk metrics to a behaviour label.
 
     Rules (applied in order; thresholds are module constants):
+      0. backward displacement first: forward_disp_mm < 0 and net speed >=
+         STRAIGHT_MIN_SPEED_MM_S (3 mm/s) and |forward_disp| >= STRAIGHT_AXIAL_RATIO (2) x
+         |lateral_disp| (both in the fly's initial body frame) and |heading change| <
+         STRAIGHT_MAX_HEADING_DEG (60 deg) -> backward. (Forward runs skip this rule.)
       1. |yaw_rate| >= TURN_RATE_THRESH_DEG_S (40 deg/s) and |heading change| >=
          TURN_MIN_ABS_DEG (10 deg) -> turn_left if heading increased
          (counter-clockwise), else turn_right. Turning in place counts as turn.
@@ -464,6 +499,13 @@ def classify(metrics: dict) -> str:
     net_speed = metrics.get("net_speed_mm_s")
     net_speed = float(net_speed) if net_speed is not None else math.hypot(fwd, lat) / dur
 
+    if (
+        fwd < 0
+        and net_speed >= STRAIGHT_MIN_SPEED_MM_S
+        and abs(fwd) >= STRAIGHT_AXIAL_RATIO * abs(lat)
+        and abs(dh) < STRAIGHT_MAX_HEADING_DEG
+    ):
+        return "backward"
     if abs(yaw_rate) >= TURN_RATE_THRESH_DEG_S and abs(dh) >= TURN_MIN_ABS_DEG:
         return "turn_left" if yaw_rate > 0 else "turn_right"
     if net_speed < STOP_SPEED_THRESH_MM_S:
@@ -523,7 +565,7 @@ def run_demo(
     duration_s: float = 1.0,
     render: bool = True,
     parallel: bool = True,
-    control_every: int = 1,
+    control_every: int = DEFAULT_CONTROL_EVERY,
 ) -> dict:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -586,8 +628,8 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--no-render", action="store_true")
     ap.add_argument("--serial", action="store_true", help="no multiprocessing")
     ap.add_argument(
-        "--control-every", type=int, default=1,
-        help="controller every N physics steps (1 = flygym default; 5 = ~3.5x faster)",
+        "--control-every", type=int, default=DEFAULT_CONTROL_EVERY,
+        help="controller every N physics steps (default 5, ~3.5x faster; 1 = flygym tutorial)",
     )
     args = ap.parse_args(argv)
 
