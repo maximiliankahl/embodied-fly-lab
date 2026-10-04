@@ -16,7 +16,8 @@
   #title.green { background: linear-gradient(90deg, #5be49b, #30d158); -webkit-background-clip: text; background-clip: text; color: transparent; }
   #title.grad { background: linear-gradient(90deg, #f5f5f7 10%, #b9c7ff 55%, #ffd29a 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
   #note { bottom: 3.2vh; font-size: 0.95vw; color: #6e6e73; letter-spacing: 0.02em; }
-  #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+  #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 5; }
+  .t { z-index: 10; }
 </style>
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
