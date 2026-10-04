@@ -9,10 +9,11 @@
    "stop",
    "escape",
    "groom",
-   "feed"
+   "feed",
+   "flight_power"
   ],
   "effect": "'induce' = manipulation evokes/increases the behaviour; 'reduce' = manipulation abolishes/decreases it. For 'reduce' entries, observing expected_behavior is INCONSISTENT with the paper - use atlas.evaluate().",
-  "built": "2026-10-04 00:40"
+  "built": "2026-10-04 08:47"
  },
  "entries": [
   {
@@ -586,6 +587,83 @@
    "evidence_fulltext": "three LC neuron driver lines that produced robust and highly penetrant activation phenotypes in both assays: LC6 (jumping)",
    "readout_group": "GF",
    "note": "The two loom-like LC types of the abstract are LC6 (jumping) and LC16 (backward walking) per the full text. GF readout is our suggestion; Wu et al. did not test GF dependence."
+  },
+  {
+   "id": "gt24_gf_activate_takeoff_vonreyn",
+   "manipulation": "activate",
+   "target_group": "GF",
+   "expected_behavior": "escape",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases escape (takeoff/jump)",
+   "evidence": "the GF circuit has a higher activation threshold than the parallel circuits, but can override ongoing behavior to force a short takeoff",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.1038/nn.3741",
+    "title": "A spike-timing mechanism for action selection",
+    "year": 2014,
+    "authors": "von Reyn CR, Breads P, Peek MY, Zheng GZ, Williamson WR, Yee AL, Leonardo A, Card GM.",
+    "url": "https://doi.org/10.1038/nn.3741",
+    "pmid": "24908103",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "medium",
+   "context": "looming-evoked escape takeoff (head-fixed GF recordings)",
+   "readout_group": "GF",
+   "note": "von Reyn et al. 2014 recorded the GF during looming-evoked escape (spike timing selects short vs. long takeoff); it is not a direct GF-activation experiment (that is Lima & Miesenboeck 2005, gt07). In the paper the GF-driven short takeoff sacrifices flight stability and the parallel (non-GF) circuits give the long takeoff that initiates stable flight - the model's single 'takeoff' label does not distinguish the two modes."
+  },
+  {
+   "id": "gt25_lplc2_gf_input_ache",
+   "manipulation": "activate",
+   "target_group": "LPLC2",
+   "expected_behavior": "escape",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases escape (takeoff/jump)",
+   "evidence": "LPLC2 and LC4 synapse directly onto the GF",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.1016/j.cub.2019.01.079",
+    "title": "Neural Basis for Looming Size and Velocity Encoding in the Drosophila Giant Fiber Escape Pathway",
+    "year": 2019,
+    "authors": "Ache JM, Polsky J, Alghailani S, Parekh R, Breads P, Peek MY, Bock DD, von Reyn CR, Card GM.",
+    "url": "https://doi.org/10.1016/j.cub.2019.01.079",
+    "pmid": "30827912",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "medium",
+   "context": "anatomical GF input (EM); behavioural LPLC2 activation -> jumping is gt08 (Wu et al. 2016)",
+   "readout_group": "GF",
+   "note": "Ache et al. 2019 abstract: anatomical (EM reconstruction) direct LPLC2 -> GF synapses and LPLC2 necessary for GF-mediated escape (gt09); the abstract contains no LPLC2 activation experiment. The mechanistic prediction for the brain model is: LPLC2 activation drives GF firing and thereby takeoff; the behavioural activation result (jumping) is Wu et al. 2016 (gt08)."
+  },
+  {
+   "id": "gt26_dng02_activate_wingbeat_amplitude",
+   "manipulation": "activate",
+   "target_group": "DNg02",
+   "expected_behavior": "flight_power",
+   "effect": "induce",
+   "expected_outcome": "activating the target group evokes/increases increased wingbeat amplitude (flight power)",
+   "evidence": "these neurons regulate wingbeat amplitude over a wide dynamic range via a population code",
+   "evidence_in_abstract": true,
+   "citation": {
+    "doi": "10.1016/j.cub.2022.01.008",
+    "title": "A population of descending neurons that regulates the flight motor of Drosophila",
+    "year": 2022,
+    "authors": "Namiki S, Ros IG, Morrow C, Rowell WJ, Card GM, Korff W, Dickinson MH.",
+    "url": "https://doi.org/10.1016/j.cub.2022.01.008",
+    "pmid": "35090590",
+    "verified_by": [
+     "europepmc",
+     "openalex"
+    ]
+   },
+   "confidence": "medium",
+   "context": "flying fly (optogenetic activation of different numbers of DNg02 cells)",
+   "note": "Namiki et al. 2022 (Curr Biol): population of DNg02 cells; more activated cells -> larger wingbeat amplitude. Our bridge uses exactly this population code (mean activation over all DNg02 neurons), so a body check against this entry is partly circular. FlyWire v783 holds 25 DNg02 neurons vs. 'at least 15 cell pairs' in the paper (medium confidence in the identification)."
   }
  ]
 }

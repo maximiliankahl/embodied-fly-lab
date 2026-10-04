@@ -1,0 +1,615 @@
+{
+ "n_dois": 42,
+ "n_resolved": 42,
+ "unresolved": [],
+ "ground_truth": {
+  "n_entries": 26,
+  "n_unique_dois": 15,
+  "n_quote_checked": 26,
+  "n_quote_in_abstract": 26,
+  "quote_not_found": []
+ },
+ "dois": {
+  "10.1007/s12264-023-01021-0": {
+   "resolved": true,
+   "title": "Neural Circuit Mechanisms Involved in Animals' Detection of and Response to Visual Threats.",
+   "year": 2023,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-093251-which-visual-neurons-trigger-esc-9460/record.jsonl"
+   ]
+  },
+  "10.1016/j.cell.2005.02.004": {
+   "resolved": true,
+   "title": "Remote control of behavior through genetically targeted photostimulation of neurons.",
+   "year": 2005,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/benchmarks/embodied_validation.json",
+    "data/benchmarks/flight_validation.json",
+    "data/ground_truth.json",
+    "data/neurons.json",
+    "docs/OMNIGENT.md",
+    "runs/20261004-093251-which-visual-neurons-trigger-esc-9460/record.jsonl"
+   ]
+  },
+  "10.1016/j.cell.2024.08.033": {
+   "resolved": true,
+   "title": "Fine-grained descending control of steering in walking Drosophila.",
+   "year": 2024,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/neurons.json"
+   ]
+  },
+  "10.1016/j.conb.2023.102822": {
+   "resolved": true,
+   "title": "Descending control of motor sequences in Drosophila.",
+   "year": 2024,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-010600-which-visual-projection-neurons-ebe8/record.jsonl"
+   ]
+  },
+  "10.1016/j.cub.2017.02.008": {
+   "resolved": true,
+   "title": "Moonwalker Descending Neurons Mediate Visually Evoked Retreat in Drosophila.",
+   "year": 2017,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/ground_truth.json",
+    "data/neurons.json",
+    "runs/20261004-010600-which-visual-projection-neurons-ebe8/record.jsonl"
+   ]
+  },
+  "10.1016/j.cub.2019.01.079": {
+   "resolved": true,
+   "title": "Neural Basis for Looming Size and Velocity Encoding in the Drosophila Giant Fiber Escape Pathway.",
+   "year": 2019,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "README.md",
+    "data/ground_truth.json",
+    "data/neurons.json",
+    "docs/OMNIGENT.md",
+    "runs/20261004-010600-which-visual-projection-neurons-ebe8/record.jsonl",
+    "runs/20261004-093251-which-visual-neurons-trigger-esc-9460/record.jsonl"
+   ]
+  },
+  "10.1016/j.cub.2022.01.008": {
+   "resolved": true,
+   "title": "A population of descending neurons that regulates the flight motor of Drosophila.",
+   "year": 2022,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/benchmarks/flight_validation.json",
+    "data/ground_truth.json",
+    "data/neurons.json"
+   ]
+  },
+  "10.1016/j.cub.2022.01.035": {
+   "resolved": true,
+   "title": "Olfactory stimuli and moonwalker SEZ neurons can drive backward locomotion in Drosophila.",
+   "year": 2022,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-010600-which-visual-projection-neurons-ebe8/record.jsonl"
+   ]
+  },
+  "10.1016/j.neuron.2008.12.033": {
+   "resolved": true,
+   "title": "Motor control in a Drosophila taste circuit.",
+   "year": 2009,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/benchmarks/embodied_validation.json",
+    "data/ground_truth.json",
+    "data/neurons.json"
+   ]
+  },
+  "10.1016/j.neuron.2017.05.036": {
+   "resolved": true,
+   "title": "Feature Integration Drives Probabilistic Behavior in the Drosophila Escape Response.",
+   "year": 2017,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/neurons.json"
+   ]
+  },
+  "10.1016/j.neuron.2020.07.032": {
+   "resolved": true,
+   "title": "Two Brain Pathways Initiate Distinct Forward Walking Programs in Drosophila.",
+   "year": 2020,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/benchmarks/embodied_validation.json",
+    "data/ground_truth.json",
+    "data/neurons.json"
+   ]
+  },
+  "10.1016/j.tins.2025.12.005": {
+   "resolved": true,
+   "title": "Flexible circuits for visually guided flight control in Drosophila.",
+   "year": 2026,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-093251-which-visual-neurons-trigger-esc-9460/record.jsonl"
+   ]
+  },
+  "10.1038/nn.3741": {
+   "resolved": true,
+   "title": "A spike-timing mechanism for action selection.",
+   "year": 2014,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "README.md",
+    "data/benchmarks/embodied_validation.json",
+    "data/benchmarks/flight_validation.json",
+    "data/ground_truth.json",
+    "data/neurons.json",
+    "docs/OMNIGENT.md",
+    "runs/20261004-093251-which-visual-neurons-trigger-esc-9460/record.jsonl"
+   ]
+  },
+  "10.1038/s41467-025-56059-7": {
+   "resolved": true,
+   "title": "Morphological and functional convergence of visual projection neurons from diverse neurogenic origins in Drosophila.",
+   "year": 2025,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-010600-which-visual-projection-neurons-ebe8/record.jsonl"
+   ]
+  },
+  "10.1038/s41586-022-05562-8": {
+   "resolved": true,
+   "title": "Synaptic gradients transform object location to action.",
+   "year": 2023,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-093251-which-visual-neurons-trigger-esc-9460/record.jsonl"
+   ]
+  },
+  "10.1038/s41586-024-07523-9": {
+   "resolved": true,
+   "title": "Descending networks transform command signals into population motor control.",
+   "year": 2024,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/ground_truth.json",
+    "data/neurons.json",
+    "runs/20261004-010600-which-visual-projection-neurons-ebe8/record.jsonl"
+   ]
+  },
+  "10.1038/s41586-024-07558-y": {
+   "resolved": true,
+   "title": "Neuronal wiring diagram of an adult brain.",
+   "year": 2024,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/neurons.json"
+   ]
+  },
+  "10.1038/s41586-024-07686-5": {
+   "resolved": true,
+   "title": "Whole-brain annotation and multi-connectome cell typing of Drosophila.",
+   "year": 2024,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/neurons.json"
+   ]
+  },
+  "10.1038/s41586-024-07763-9": {
+   "resolved": true,
+   "title": "A Drosophila computational brain model reveals sensorimotor processing.",
+   "year": 2024,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "README.md",
+    "data/benchmarks/brain_validation.json",
+    "data/benchmarks/embodied_validation.json",
+    "data/benchmarks/screen_gf.json",
+    "data/benchmarks/screen_mdn.json",
+    "data/ground_truth.json",
+    "data/neurons.json"
+   ]
+  },
+  "10.1038/s41586-024-07854-7": {
+   "resolved": true,
+   "title": "Neural circuit mechanisms underlying context-specific halting in Drosophila.",
+   "year": 2024,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/neurons.json"
+   ]
+  },
+  "10.1038/s41586-025-08925-z": {
+   "resolved": true,
+   "title": "Comparative connectomics of Drosophila descending and ascending neurons.",
+   "year": 2025,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/neurons.json"
+   ]
+  },
+  "10.1038/s41586-025-09029-4": {
+   "resolved": true,
+   "title": "Whole-body physics simulation of fruit fly locomotion.",
+   "year": 2025,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "README.md",
+    "data/benchmarks/flight_validation.json"
+   ]
+  },
+  "10.1038/s41586-026-10735-w": {
+   "resolved": true,
+   "title": "Distributed control circuits across a brain-and-cord connectome.",
+   "year": 2026,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-093251-which-visual-neurons-trigger-esc-9460/record.jsonl"
+   ]
+  },
+  "10.1038/s41592-024-02497-y": {
+   "resolved": true,
+   "title": "NeuroMechFly v2: simulating embodied sensorimotor control in adult Drosophila.",
+   "year": 2024,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "README.md",
+    "data/benchmarks/embodied_validation.json"
+   ]
+  },
+  "10.1101/2022.07.15.500271": {
+   "resolved": true,
+   "title": "Directional invariance in the Drosophila giant fiber escape circuit",
+   "year": 2022,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-093251-which-visual-neurons-trigger-esc-9460/record.jsonl"
+   ]
+  },
+  "10.1101/2025.07.22.666129": {
+   "resolved": true,
+   "title": "Control of walking direction by descending and dopaminergic neurons in Drosophila",
+   "year": 2025,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-010600-which-visual-projection-neurons-ebe8/record.jsonl"
+   ]
+  },
+  "10.1101/339556": {
+   "resolved": true,
+   "title": "A command-like descending neuron that coordinately activates backward and inhibits forward locomotion",
+   "year": 2018,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-010600-which-visual-projection-neurons-ebe8/record.jsonl"
+   ]
+  },
+  "10.1126/science.1249964": {
+   "resolved": true,
+   "title": "Neuronal control of Drosophila walking direction.",
+   "year": 2014,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/benchmarks/embodied_validation.json",
+    "data/ground_truth.json",
+    "data/neurons.json",
+    "runs/20261004-010600-which-visual-projection-neurons-ebe8/record.jsonl"
+   ]
+  },
+  "10.1126/science.284.5422.1954": {
+   "resolved": true,
+   "title": "Wing rotation and the aerodynamic basis of insect flight.",
+   "year": 1999,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/benchmarks/flight_validation.json"
+   ]
+  },
+  "10.1242/jeb.244790": {
+   "resolved": true,
+   "title": "Azimuthal invariance to looming stimuli in the Drosophila giant fiber escape circuit.",
+   "year": 2023,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-093251-which-visual-neurons-trigger-esc-9460/record.jsonl"
+   ]
+  },
+  "10.1371/journal.pbio.3003553": {
+   "resolved": true,
+   "title": "The Drosophila escape motor circuit shows differential vulnerability to aging linked to functional decay.",
+   "year": 2025,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-093251-which-visual-neurons-trigger-esc-9460/record.jsonl"
+   ]
+  },
+  "10.25358/openscience-14000": {
+   "resolved": true,
+   "title": "The Drosophila escape motor circuit shows differential vulnerability to aging linked to functional decay",
+   "year": 2025,
+   "source": "openalex",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-093251-which-visual-neurons-trigger-esc-9460/record.jsonl"
+   ]
+  },
+  "10.3389/fncir.2023.1175899": {
+   "resolved": true,
+   "title": "Linking neural circuits to the mechanics of animal behavior in Drosophila larval locomotion.",
+   "year": 2023,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-010600-which-visual-projection-neurons-ebe8/record.jsonl"
+   ]
+  },
+  "10.3389/fnins.2022.883640": {
+   "resolved": true,
+   "title": "From Photons to Behaviors: Neural Implementations of Visual Behaviors in Drosophila.",
+   "year": 2022,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-010600-which-visual-projection-neurons-ebe8/record.jsonl"
+   ]
+  },
+  "10.5281/zenodo.10676866": {
+   "resolved": true,
+   "title": "FlyWire Whole-brain Connectome Connectivity Data",
+   "year": 2024,
+   "source": "openalex",
+   "error": null,
+   "cited_in": [
+    "README.md"
+   ]
+  },
+  "10.6082/stgmj-6q824": {
+   "resolved": true,
+   "title": "Control of Escape Behavior by Descending Neurons in Drosophila Melanogaster",
+   "year": 2018,
+   "source": "openalex",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-093251-which-visual-neurons-trigger-esc-9460/record.jsonl"
+   ]
+  },
+  "10.7554/elife.08758": {
+   "resolved": true,
+   "title": "A neural command circuit for grooming movement control.",
+   "year": 2015,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/benchmarks/embodied_validation.json",
+    "data/ground_truth.json",
+    "data/neurons.json"
+   ]
+  },
+  "10.7554/elife.102230": {
+   "resolved": true,
+   "title": "Neural circuit mechanisms for steering control in walking Drosophila.",
+   "year": 2025,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/benchmarks/embodied_validation.json",
+    "data/benchmarks/flight_validation.json",
+    "data/ground_truth.json",
+    "data/neurons.json"
+   ]
+  },
+  "10.7554/elife.21022": {
+   "resolved": true,
+   "title": "Visual projection neurons in the Drosophila lobula link feature detection to distinct behavioral programs.",
+   "year": 2016,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "README.md",
+    "data/ground_truth.json",
+    "data/neurons.json",
+    "docs/OMNIGENT.md",
+    "runs/20261004-010600-which-visual-projection-neurons-ebe8/record.jsonl",
+    "runs/20261004-093251-which-visual-neurons-trigger-esc-9460/record.jsonl"
+   ]
+  },
+  "10.7554/elife.34275": {
+   "resolved": true,
+   "title": "Optogenetic dissection of descending behavioral control in Drosophila.",
+   "year": 2018,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/ground_truth.json",
+    "data/neurons.json"
+   ]
+  },
+  "10.7554/elife.79887": {
+   "resolved": true,
+   "title": "Taste quality and hunger interactions in a feeding sensorimotor circuit.",
+   "year": 2022,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "data/ground_truth.json",
+    "data/neurons.json"
+   ]
+  },
+  "10.7554/elife.96084": {
+   "resolved": true,
+   "title": "Organization of circuits linking descending input to motor output in the Drosophila Male Adult Nerve Cord connectome.",
+   "year": 2026,
+   "source": "europepmc",
+   "error": null,
+   "cited_in": [
+    "runs/20261004-010600-which-visual-projection-neurons-ebe8/record.jsonl"
+   ]
+  }
+ },
+ "quotes": [
+  {
+   "id": "gt01_mdn_activate_backward",
+   "doi": "10.1126/science.1249964",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt02_mdn_silence_backward",
+   "doi": "10.1126/science.1249964",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt03_p9_activate_forward",
+   "doi": "10.1016/j.neuron.2020.07.032",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt04_p9L_activate_turn_left",
+   "doi": "10.1016/j.neuron.2020.07.032",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt05_dna02L_activate_turn_left",
+   "doi": "10.7554/elife.102230",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt06_dna02R_activate_turn_right",
+   "doi": "10.7554/elife.102230",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt07_gf_activate_escape",
+   "doi": "10.1016/j.cell.2005.02.004",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt08_lplc2_activate_escape",
+   "doi": "10.7554/elife.21022",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt19_lplc2_activate_backward",
+   "doi": "10.7554/elife.21022",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt09_lplc2_silence_escape",
+   "doi": "10.1016/j.cub.2019.01.079",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt10_sugar_activate_feed",
+   "doi": "10.1016/j.neuron.2008.12.033",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt11_bitter_activate_reduce_feed",
+   "doi": "10.7554/elife.79887",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt12_mn9_activate_feed",
+   "doi": "10.1016/j.neuron.2008.12.033",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt13_water_activate_feed",
+   "doi": "10.1038/s41586-024-07763-9",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt14_jo_activate_groom",
+   "doi": "10.7554/elife.08758",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt15_abn1_activate_groom",
+   "doi": "10.7554/elife.08758",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt16_dng07_activate_groom",
+   "doi": "10.7554/elife.34275",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt17_p9_activate_forward_braun",
+   "doi": "10.1038/s41586-024-07523-9",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt18_mdn_activate_backward_braun",
+   "doi": "10.1038/s41586-024-07523-9",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt20_lc16_activate_backward",
+   "doi": "10.7554/elife.21022",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt21_lc16_activate_backward_via_mdn",
+   "doi": "10.1016/j.cub.2017.02.008",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt22_lc4_activate_escape",
+   "doi": "10.7554/elife.21022",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt23_lc6_activate_escape",
+   "doi": "10.7554/elife.21022",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt24_gf_activate_takeoff_vonreyn",
+   "doi": "10.1038/nn.3741",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt25_lplc2_gf_input_ache",
+   "doi": "10.1016/j.cub.2019.01.079",
+   "quote_in_abstract": true
+  },
+  {
+   "id": "gt26_dng02_activate_wingbeat_amplitude",
+   "doi": "10.1016/j.cub.2022.01.008",
+   "quote_in_abstract": true
+  }
+ ]
+}

@@ -52,6 +52,12 @@ LIMITATIONS
     kinematics (see flylab.body).
   * A steering DN active without a locomotor DN produces turning in place (the body has no
     "resting fly ignores steering" state); the papers activated steering DNs in walking flies.
+
+FLIGHT (Phase 3, frozen adapter; see the block "flight adapter" below and describe()["flight"])
+  rates_to_flight_command(rates) -> {"takeoff","thrust","yaw","pitch","explain"} for flylab.flight:
+    takeoff <- GF (escape trigger), thrust <- DNg02 population (Namiki et al. 2022), yaw <- DNa01/DNa02 asymmetry
+    (transfer assumption), pitch = 0. rates_to_behavior_command(rates) -> {"mode": "walk"|"flight", ...} picks flight
+    when the GF takeoff trigger is active. The walking mapping above is unchanged.
 """
 
 from __future__ import annotations
@@ -145,7 +151,7 @@ def _is_neuron_key(k: Any) -> bool:
     return str(k).strip().isdigit()
 
 
-def group_rates(rates: dict | None) -> tuple[dict[str, float], dict]:
+def group_rates(rates: dict | None, needed: list[str] | None = None) -> tuple[dict[str, float], dict]:
     """Rates of the groups the bridge needs, from per-neuron OR group-level input.
 
     Auto-detect: if every key is all-digit -> per-neuron rates {root_id: Hz} (as
@@ -154,20 +160,22 @@ def group_rates(rates: dict | None) -> tuple[dict[str, float], dict]:
     Otherwise -> group rates {group_name: Hz}; names/aliases resolved with
     atlas.resolve_group; a side group missing from the input falls back to its bilateral
     group (e.g. "MDN" for MDN_L and MDN_R); digit / unknown keys are ignored and listed.
-    Returns (group -> Hz, info).
+    Returns (group -> Hz, info). `needed` (default NEEDED_GROUPS, the walking groups) selects other groups,
+    e.g. FLIGHT_NEEDED_GROUPS for the flight command.
     """
     from flylab import atlas
 
+    needed = list(needed) if needed else NEEDED_GROUPS
     rates = dict(rates or {})
     info: dict[str, Any] = {}
     if not rates:
         info["input_mode"] = "empty"
-        return {g: 0.0 for g in NEEDED_GROUPS}, info
+        return {g: 0.0 for g in needed}, info
     if all(_is_neuron_key(k) for k in rates):
         info["input_mode"] = "neuron_rates"
         clean = {str(k).strip(): _clean_rate(v) for k, v in rates.items()}
         out = {}
-        for g in NEEDED_GROUPS:
+        for g in needed:
             ids = atlas.group_ids(g)
             out[g] = (sum(clean.get(str(i), 0.0) for i in ids) / len(ids)) if ids else 0.0
         return out, info
@@ -184,7 +192,7 @@ def group_rates(rates: dict | None) -> tuple[dict[str, float], dict]:
         except KeyError:
             ignored.append(str(k))
     out, fallbacks = {}, []
-    for g in NEEDED_GROUPS:
+    for g in needed:
         if g in canon:
             out[g] = canon[g]
             continue
@@ -291,6 +299,7 @@ def describe() -> dict:
         "readouts": readouts,
         "readout_threshold_note": SHIU_ACTIVE_DEF,
         "body": "flylab.body (NeuroMechFly / flygym 2.1 hybrid turning controller), doi:10.1038/s41592-024-02497-y",
+        "flight": describe_flight(),
         "limitations": [
             "Weights (1.0 / 0.5 / 0.5) and the linear-saturating activation are hand-chosen, not fitted.",
             "Only P9, MDN, DNa01, DNa02 drive the body; all other descending neurons are ignored.",
@@ -298,6 +307,160 @@ def describe() -> dict:
             "Steering DNs without a locomotor DN give turning in place; papers tested walking flies.",
             "MDN asymmetry (backward turning) not mapped; backward gait = reversed forward kinematics.",
             "Escape / feeding / grooming are brain-level readouts only (the body cannot jump, groom or feed).",
+        ],
+    }
+
+
+# --------------------------------------------------------------------------- flight adapter (Phase 3)
+# Frozen before the flight comparison runs (G3): parameters below + FLIGHT_FROZEN["parameter_hash"].
+#
+#   takeoff = mean(a(GF_L), a(GF_R))                    giant fiber (DNp01): escape takeoff trigger
+#                                                       Lima & Miesenboeck 2005; von Reyn et al. 2014
+#             flylab.flight starts the escape sequence (jump + wing start) when takeoff >= 0.5
+#   thrust  = BASELINE + (1-BASELINE) * a(DNg02 pop)    DNg02 population code -> wingbeat amplitude
+#             pop = neuron-count-weighted mean of DNg02_L / DNg02_R  (Namiki et al. 2022, Curr Biol)
+#             BASELINE = 0.0: thrust 0 = the hand-designed hover trim of flylab.flight (constant baseline
+#             flight-motor drive once airborne; the connectome adds amplitude on top of it)
+#   yaw     = clip(1.0*d(DNa02) + 0.5*d(DNa01), -1, 1)  d = a_R - a_L (neg = left). TRANSFER ASSUMPTION: these are
+#             WALKING steering DNs (Rayshubskiy et al. 2025); no literature-verified flight-steering DN pair
+#             was identified here and flight yaw is not part of the flight validation.
+#   pitch   = 0.0                                       no connectome input (documented default: no forward drive)
+#   a(g) = min(1, rate/REF_RATE_HZ) with the same measured reference as the walking bridge (148.3 Hz).
+FLIGHT_TAKEOFF_THRESHOLD = 0.5   # == flylab.flight escape trigger (cmd["takeoff"] >= 0.5), i.e. half the reference rate
+FLIGHT_BASELINE_THRUST = 0.0
+FLIGHT_STEERING_TERMS = [("DNa02", 1.0), ("DNa01", 0.5)]
+FLIGHT_NEEDED_GROUPS = ["GF_L", "GF_R", "DNg02_L", "DNg02_R", "DNa01_L", "DNa01_R", "DNa02_L", "DNa02_R"]
+FLIGHT_CITATIONS = {
+    "takeoff": ["10.1016/j.cell.2005.02.004", "10.1038/nn.3741"],
+    "thrust": ["10.1016/j.cub.2022.01.008"],
+    "yaw": ["10.7554/elife.102230"],
+}
+FLIGHT_PARAMS = {"takeoff_group": "GF", "takeoff_rule": "mean(a(GF_L), a(GF_R))",
+                 "takeoff_threshold": FLIGHT_TAKEOFF_THRESHOLD, "thrust_group": "DNg02",
+                 "thrust_rule": "baseline + (1-baseline)*a(n-weighted mean rate of DNg02_L, DNg02_R)",
+                 "thrust_baseline": FLIGHT_BASELINE_THRUST, "yaw_terms": FLIGHT_STEERING_TERMS, "pitch": 0.0,
+                 "ref_rate_hz": REF_RATE_HZ}
+
+
+def _flight_param_hash() -> str:
+    import hashlib
+    return hashlib.sha256(json.dumps(FLIGHT_PARAMS, sort_keys=True).encode()).hexdigest()[:16]
+
+
+FLIGHT_FROZEN = {"version": "flight-adapter-v1", "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+                 "parameter_hash": _flight_param_hash(),
+                 "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; "
+                         "a changed hash means the adapter was modified after the comparison."}
+
+
+def rates_to_flight_command(rates: dict | None, ref_rate_hz: float = REF_RATE_HZ) -> dict:
+    """Descending-neuron rates -> flight command {"takeoff","thrust","yaw","pitch","explain"} (see block comment above).
+
+    rates: per-neuron {root_id_str: Hz} or group {group_name: Hz} (auto-detected, same as rates_to_drive).
+    What the connectome decides: whether takeoff is triggered (GF), how much wingbeat amplitude is added (DNg02) and
+    the left/right steering asymmetry. NOT decided by it: the jump impulse, wing kinematics, attitude stabilisation
+    (halteres / visual feedback stand-ins) and the baseline flight-motor drive (all hand-designed, flylab.flight).
+    """
+    from flylab import atlas
+
+    grp, info = group_rates(rates, FLIGHT_NEEDED_GROUPS)
+    a = {g: activation(grp[g], ref_rate_hz) for g in FLIGHT_NEEDED_GROUPS}
+    takeoff = min(1.0, max(0.0, (a["GF_L"] + a["GF_R"]) / 2.0))
+    n_l, n_r = len(atlas.group_ids("DNg02_L")), len(atlas.group_ids("DNg02_R"))
+    pop_hz = (n_l * grp["DNg02_L"] + n_r * grp["DNg02_R"]) / max(1, n_l + n_r)
+    a_pop = activation(pop_hz, ref_rate_hz)
+    thrust = min(1.0, max(0.0, FLIGHT_BASELINE_THRUST + (1.0 - FLIGHT_BASELINE_THRUST) * a_pop))
+    yaw_terms = {}
+    yaw_raw = 0.0
+    for base, w in FLIGHT_STEERING_TERMS:
+        c = w * (a[f"{base}_R"] - a[f"{base}_L"])
+        yaw_raw += c
+        yaw_terms[base] = round(c, 4)
+    yaw = max(-1.0, min(1.0, yaw_raw))
+    triggered = takeoff >= FLIGHT_TAKEOFF_THRESHOLD
+    explain = {
+        **info,
+        "group_rates_hz": {g: round(float(v), 3) for g, v in grp.items()},
+        "activation": {g: round(v, 4) for g, v in a.items()},
+        "ref_rate_hz": float(ref_rate_hz),
+        "terms": {
+            "takeoff": f"mean(a(GF_L)={a['GF_L']:.3f}, a(GF_R)={a['GF_R']:.3f}) = {takeoff:.3f}",
+            "thrust": (f"{FLIGHT_BASELINE_THRUST} + {1.0 - FLIGHT_BASELINE_THRUST} * a(DNg02 population "
+                       f"{pop_hz:.2f} Hz; n_L={n_l}, n_R={n_r}) = {thrust:.3f}"),
+            "yaw_components (w*(a_R-a_L))": yaw_terms, "yaw_raw": round(yaw_raw, 4), "pitch": "0.0 (no connectome input)",
+        },
+        "takeoff_threshold": FLIGHT_TAKEOFF_THRESHOLD, "takeoff_triggered": bool(triggered),
+        "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; "
+                                             "without GF-driven takeoff the thrust value has no effect",
+        "formula": ("a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); "
+                    "yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0"),
+        "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+        "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, "
+                         "quasi-steady aerodynamics (flylab.flight.model_notes())",
+        "frozen": dict(FLIGHT_FROZEN),
+        "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates",
+    }
+    return {"takeoff": round(takeoff, 4), "thrust": round(thrust, 4), "yaw": round(yaw, 4), "pitch": 0.0, "explain": explain}
+
+
+def rates_to_behavior_command(rates: dict | None, ref_rate_hz: float = REF_RATE_HZ) -> dict:
+    """Choose the body mode from brain rates: flight if the takeoff trigger (GF) is active, else walking.
+
+    Returns {"mode": "walk", "drive": {...}, "explain": {...}} or {"mode": "flight", "command": {...}, "explain": {...}}.
+    Design choice (not from a paper): an active GF escape takeoff pre-empts walking commands; below the threshold
+    the walking drive of rates_to_drive() is returned unchanged.
+    """
+    cmd = rates_to_flight_command(rates, ref_rate_hz)
+    ex = cmd["explain"]
+    rule = (f"mode = flight if takeoff = mean(a(GF_L), a(GF_R)) >= {FLIGHT_TAKEOFF_THRESHOLD} "
+            f"(= {FLIGHT_TAKEOFF_THRESHOLD * ref_rate_hz:.0f} Hz mean GF rate), else walk")
+    if ex["takeoff_triggered"]:
+        return {"mode": "flight", "command": {k: cmd[k] for k in ("takeoff", "thrust", "yaw", "pitch")},
+                "explain": {"mode_rule": rule, **ex}}
+    drive = rates_to_drive(rates, ref_rate_hz)
+    return {"mode": "walk", "drive": {k: drive[k] for k in ("forward", "turn", "backward")},
+            "explain": {"mode_rule": rule, "takeoff_activation": cmd["takeoff"],
+                        "takeoff_threshold": FLIGHT_TAKEOFF_THRESHOLD, **drive["explain"]}}
+
+
+def describe_flight() -> dict:
+    """Machine-readable table of the (frozen) flight adapter."""
+    return {
+        "name": "flylab.bridge flight adapter (hand-designed, frozen)",
+        "frozen": dict(FLIGHT_FROZEN),
+        "params": FLIGHT_PARAMS,
+        "terms": [
+            {"output": "takeoff", "groups": ["GF_L", "GF_R"], "formula": "takeoff = mean(a(GF_L), a(GF_R)); escape sequence if >= "
+             f"{FLIGHT_TAKEOFF_THRESHOLD}", "citations": FLIGHT_CITATIONS["takeoff"],
+             "description": "Giant fiber (DNp01): GF activation elicits escape takeoff / wing beating / flight (Lima & Miesenboeck 2005); "
+                            "GF spike timing selects short vs. long takeoff (von Reyn et al. 2014). Threshold = half the measured "
+                            "reference rate (hand-chosen)."},
+            {"output": "thrust", "groups": ["DNg02_L", "DNg02_R"], "formula": "thrust = a(n-weighted mean DNg02 rate)",
+             "citations": FLIGHT_CITATIONS["thrust"],
+             "description": "DNg02 population code for wingbeat amplitude (Namiki et al. 2022). 25 DNg02 neurons in FlyWire v783 vs "
+                            "'at least 15 pairs' in the paper (identification by cell-type name, medium confidence). "
+                            "thrust 0 = hand-designed hover trim (constant baseline flight-motor drive once airborne)."},
+            {"output": "yaw", "groups": ["DNa02_L", "DNa02_R", "DNa01_L", "DNa01_R"],
+             "formula": "yaw = clip(1.0*(a(DNa02_R)-a(DNa02_L)) + 0.5*(a(DNa01_R)-a(DNa01_L)), -1, 1)",
+             "citations": FLIGHT_CITATIONS["yaw"],
+             "description": "Walking-steering DNs reused for flight yaw: a TRANSFER ASSUMPTION, not literature-verified for flight."},
+            {"output": "pitch", "groups": [], "formula": "pitch = 0", "citations": [],
+             "description": "No connectome input: no forward-flight drive."},
+        ],
+        "mode_rule": "flight if takeoff >= threshold (rates_to_behavior_command), else the walking drive",
+        "scope": "FlyWire covers the brain only; the VNC, flight muscles, halteres and wing hinge are replaced by this adapter "
+                 "and by flylab.flight (quasi-steady aerodynamics + attitude stabiliser).",
+        "limitations": [
+            "G4: a body controller that can fly is not evidence of connectome-controlled flight. The connectome decides only the "
+            "takeoff trigger (GF), the wingbeat-amplitude increment (DNg02) and a steering asymmetry; everything else is hand-designed.",
+            "GF is the only takeoff trigger. In real flies parallel (non-GF) circuits also produce takeoffs (long takeoff that initiates "
+            "stable flight, von Reyn et al. 2014), so 'GF silenced -> no takeoff' is a consequence of this design, not a finding.",
+            "The model has a single takeoff label; the short (GF-driven, flight-unstable) vs. long takeoff modes are not distinguished.",
+            "Post-takeoff flight stability comes from the hand-designed attitude stabiliser, not from the connectome.",
+            "Open loop: constant command from time-averaged 1-s brain rates; no visual or haltere feedback to the brain.",
+            "Yaw reuses walking-steering DNs (assumption); flight turning is not validated against literature.",
+            "A single GF at full rate gives takeoff = 0.5 = the threshold (borderline by construction); unilateral GF activation "
+            "is not validated.",
         ],
     }
 

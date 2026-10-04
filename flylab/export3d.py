@@ -86,16 +86,44 @@ RUN_SPECS: dict[str, dict] = {
         "excite": ["LPLC2"], "silence": [], "mode": "walk", "expected": "backward",
         "gt": "gt19_lplc2_activate_backward", "kind": "surprise",
     },
-    # flight runs (need flylab.flight + bridge.rates_to_flight_command; skipped otherwise)
+    # flight runs (need flylab.flight; use the bridge flight command when it exists, else a labelled direct command)
     "gf_takeoff": {
-        "title": "Giant fiber activation -> takeoff and flight",
+        "title": "Giant fiber activation -> escape takeoff and flight",
         "excite": ["GF"], "silence": [], "mode": "flight", "expected": "escape",
-        "gt": "gt07_gf_activate_escape", "kind": "validation",
+        "gt": "gt07_gf_activate_escape", "kind": "validation", "condition": "GF_bilateral",
     },
     "lplc2_takeoff": {
-        "title": "LPLC2 looming detectors -> giant fiber -> takeoff",
+        "title": "LPLC2 looming detectors -> giant fiber -> escape takeoff",
         "excite": ["LPLC2"], "silence": [], "mode": "flight", "expected": "escape",
-        "gt": "gt08_lplc2_activate_escape", "kind": "validation",
+        "gt": "gt08_lplc2_activate_escape", "kind": "validation", "condition": "LPLC2_bilateral",
+    },
+    "gf_dng02_climb": {
+        "title": "Giant fiber + DNg02 population -> takeoff with added wingbeat amplitude (climb)",
+        "excite": ["GF", "DNg02"], "silence": [], "mode": "flight", "expected": "escape",
+        "gt": "gt26_dng02_activate_wingbeat_amplitude", "kind": "validation", "condition": "GF_DNg02",
+        "gt_note": "Partly circular: the bridge maps the DNg02 population to wingbeat amplitude using the same paper "
+                   "that defines the expectation, and the amplitude gain is a design constant (plumbing check, not a discovery).",
+    },
+    "lplc2_30hz_takeoff": {
+        "title": "LPLC2 at 30 Hz (weaker looming stand-in) -> takeoff (model prediction)",
+        "excite": ["LPLC2"], "silence": [], "mode": "flight", "expected": "escape", "rate": 30.0,
+        "gt": "gt08_lplc2_activate_escape", "kind": "prediction", "condition": "LPLC2_30Hz",
+        "gt_note": "Dose-response point of the model, not a literature result: the cited paper activated LPLC2 "
+                   "optogenetically at an unknown, unmatched strength.",
+    },
+    "lplc2_10hz_no_takeoff": {
+        "title": "LPLC2 at 10 Hz (sub-threshold) -> no takeoff (model prediction)",
+        "excite": ["LPLC2"], "silence": [], "mode": "flight", "expected": "no_takeoff", "rate": 10.0,
+        "gt": "gt08_lplc2_activate_escape", "kind": "prediction", "condition": "LPLC2_10Hz",
+        "gt_note": "Dose-response point of the model, not a literature result: weak drive is predicted to stay below the "
+                   "giant-fiber takeoff threshold. The cited paper reports activation at a stronger, unmatched drive.",
+    },
+    "lplc2_gf_silenced": {
+        "title": "LPLC2 activation with giant fiber silenced -> no takeoff (control)",
+        "excite": ["LPLC2"], "silence": ["GF"], "mode": "flight", "expected": "no_takeoff",
+        "gt": "gt09_lplc2_silence_escape", "kind": "control", "condition": "LPLC2_GF_silenced",
+        "gt_note": "In-silico control: the giant fiber (downstream of LPLC2) is silenced. The cited paper silenced "
+                   "LPLC2 itself; this control tests the same pathway one synapse later and is not a replication.",
     },
 }
 
@@ -448,9 +476,23 @@ def _ground_truth(gt_id: str | None) -> dict | None:
 
     for e in atlas.ground_truth():
         if e.get("id") == gt_id:
-            return {k: e.get(k) for k in ("id", "manipulation", "target_group", "expected_behavior",
+            return {k: e.get(k) for k in ("id", "manipulation", "target_group", "expected_behavior", "effect",
                                            "evidence", "citation")}
     return None
+
+
+def _verifier_benchmark() -> dict | None:
+    """Headline numbers of the committed verifier benchmark (data/benchmarks/movement_verifier.json)."""
+    p = ROOT / "data" / "benchmarks" / "movement_verifier.json"
+    try:
+        s = json.loads(p.read_text(encoding="utf-8"))["summary"]
+        return {"file": "data/benchmarks/movement_verifier.json", "n_runs": s["n_runs"],
+                "kinematic_correct_on_known_label": s["kinematic_correct_on_known_label"],
+                "kinematic_incorrect_on_opposite_label": s["kinematic_incorrect_on_opposite_label"],
+                "vision_exact_on_unique_videos": s["vision_exact_on_unique_videos"],
+                "vision_unique_videos": s["vision_unique_videos"]}
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _verify(result: dict, expected: str | None, mode: str) -> dict | None:
@@ -464,7 +506,8 @@ def _verify(result: dict, expected: str | None, mode: str) -> dict | None:
         v = verify.verify_movement(result, expected, mode=mode, use_vision=False)
         keep = {k: v.get(k) for k in ("kinematic", "final_verdict", "agreement") if k in v}
         keep["available"] = True
-        keep["vision"] = "not run for this export (kinematic check only; vision check needs a rendered video and an API call)"
+        keep["benchmark"] = _verifier_benchmark()
+        keep["vision"] ="not run for this export (kinematic check only; vision check needs a rendered video and an API call)"
         return keep
     except Exception as exc:  # noqa: BLE001
         return {"available": False, "note": f"verify_movement failed: {type(exc).__name__}: {exc}"[:300]}
@@ -472,26 +515,92 @@ def _verify(result: dict, expected: str | None, mode: str) -> dict | None:
 
 def _flight_available() -> bool:
     try:
-        from flylab import bridge, flight  # noqa: F401
+        from flylab import flight
 
-        return hasattr(flight, "simulate_flight") and hasattr(bridge, "rates_to_flight_command")
+        return hasattr(flight, "simulate_flight")
     except Exception:  # noqa: BLE001
         return False
+
+
+DIRECT_GF_MIN_HZ = 20.0
+FLIGHT_BENCH = ROOT / "data" / "benchmarks" / "flight_validation.json"
+
+
+def _vision_summary(vis: dict | None, err: str | None = None) -> str:
+    if not vis:
+        return err or "not run for this condition (kinematic check only)"
+    bits = []
+    for k in ("observed_behavior", "verdict", "confidence", "matches_expected"):
+        if vis.get(k) is not None:
+            bits.append(f"{k.replace('_', ' ')}: {vis[k]}")
+    model = vis.get("model")
+    return "blind Claude-vision check (" + (model or "model n/a") + "; sees neither the expected behaviour nor the kinematics): " + ", ".join(bits)
+
+
+def _flight_validation(condition: str | None, res: dict) -> dict | None:
+    """Attach the flight_validation.json row of ``condition`` and check this export reproduces it."""
+    if not condition or not FLIGHT_BENCH.exists():
+        return None
+    try:
+        bench = json.loads(FLIGHT_BENCH.read_text(encoding="utf-8"))
+        rows = next((v for v in bench.values() if isinstance(v, list) and v and isinstance(v[0], dict) and "condition" in v[0]), [])
+        row = next((r for r in rows if r.get("condition") == condition), None)
+        if row is None:
+            return None
+        b = row.get("body", {})
+        same = (b.get("behavior") == res.get("behavior") and bool(b.get("airborne")) == bool(res.get("airborne"))
+                and abs(float(b.get("max_height_mm", 0)) - float(res.get("max_height_mm", 0))) < 0.05)
+        ver = row.get("verification") or {}
+        verifier = {"available": True, "final_verdict": ver.get("final_verdict"),
+                    "kinematic": ver.get("kinematic"), "agreement": ver.get("agreement"), "reason": ver.get("reason"),
+                    "benchmark": _verifier_benchmark(),
+                    "vision": _vision_summary(ver.get("vision"), ver.get("vision_error")),
+                    "vision_detail": ver.get("vision")}
+        return {"verifier": verifier, "validation": {
+            "file": "data/benchmarks/flight_validation.json", "condition": condition,
+            "expected": row.get("expected"), "expected_source": row.get("expected_source"),
+            "as_expected": row.get("as_expected"), "result_type": row.get("result_type"),
+            "result_type_text": row.get("result_type_text"), "stimulus_text": row.get("stimulus"),
+            "checks": row.get("checks"), "necessity_check": row.get("necessity_check"),
+            "note_walk": row.get("note_walk"), "frozen_hash": (row.get("adapter") or {}).get("frozen_hash"),
+            "export_reproduces_validation_run": bool(same)}}
+    except Exception as exc:  # noqa: BLE001
+        return {"validation": {"file": "data/benchmarks/flight_validation.json", "condition": condition,
+                               "error": f"{type(exc).__name__}: {exc}"[:200]}}
+
+
+def _direct_flight_command(rates: dict, atlas) -> tuple[dict, dict]:
+    """Fallback when flylab.bridge has no flight mapping: takeoff trigger straight from the GF rate."""
+    ids = atlas.group_ids("GF")
+    vals = [float(rates.get(i, rates.get(str(i), 0.0)) or 0.0) for i in ids]
+    gf = float(np.mean(vals)) if vals else 0.0
+    on = gf >= DIRECT_GF_MIN_HZ
+    command = {"takeoff": 1.0 if on else 0.0, "thrust": 0.5 if on else 0.0, "yaw": 0.0, "pitch": 0.0}
+    return command, {"group_rates_hz": {"GF": _r(gf, 2)}, "rule": f"takeoff = GF mean rate >= {DIRECT_GF_MIN_HZ:.0f} Hz",
+                     "direct_command": True}
 
 
 def export_run(run_id: str, excite: list[str], silence: list[str] | None = None, *, mode: str = "walk",
                expected: str | None = None, gt: str | None = None, title: str | None = None,
                kind: str = "validation", duration_s: float = 1.0, brain_ms: float = 1000.0,
-               n_trials: int = 3, seed: int = 0, top_n: int = 25) -> str:
-    """Run brain -> bridge -> body (walk) or flight, record poses and write web/data/runs/<run_id>.json."""
+               n_trials: int = 3, seed: int = 0, top_n: int = 25, gt_note: str | None = None,
+               precomputed: dict | None = None, excite_rate_hz: float | None = None,
+               condition: str | None = None) -> str:
+    """Run brain -> bridge -> body (walk) or flight, record poses and write web/data/runs/<run_id>.json.
+
+    ``precomputed``: an already simulated ``flylab.flight.simulate_flight`` result (with poses) to export
+    instead of simulating again. ``excite_rate_hz``: Poisson drive of the excited groups (default 150 Hz).
+    ``condition``: name of the matching row in data/benchmarks/flight_validation.json (flight runs); the row's
+    verification, result type and ground-truth checks are attached under ``validation``."""
     from flylab import atlas, brain, bridge
 
     silence = list(silence or [])
+    rate_hz = float(EXCITE_RATE_HZ if excite_rate_hz is None else excite_rate_hz)
     t0 = time.perf_counter()
     ex_ids = [i for g in excite for i in atlas.group_ids(g)]
     si_ids = [i for g in silence for i in atlas.group_ids(g)]
     if ex_ids:
-        bres = brain.simulate(ex_ids, si_ids or None, excite_rate_hz=EXCITE_RATE_HZ, duration_ms=brain_ms,
+        bres = brain.simulate(ex_ids, si_ids or None, excite_rate_hz=rate_hz, duration_ms=brain_ms,
                               n_trials=n_trials, seed=seed, n_threads=min(4, n_trials))
         rates = bres["rates"]
         brain_rt = bres.get("runtime_s")
@@ -499,13 +608,24 @@ def export_run(run_id: str, excite: list[str], silence: list[str] | None = None,
         rates, brain_rt = {}, 0.0
     readouts = bridge.brain_readouts(rates)
 
+    bridge_note = None
     if mode == "flight":
         from flylab import flight
 
-        cmd_full = bridge.rates_to_flight_command(rates)
-        command = {k: cmd_full[k] for k in ("takeoff", "thrust", "yaw", "pitch") if k in cmd_full}
-        res = flight.simulate_flight(command, duration_s=duration_s, seed=seed, record_poses=True)
-        adapter = {"type": "flight_command", "values": command, "explain": cmd_full.get("explain")}
+        if hasattr(bridge, "rates_to_flight_command"):
+            cmd_full = bridge.rates_to_flight_command(rates)
+            command = {k: cmd_full[k] for k in ("takeoff", "thrust", "yaw", "pitch") if k in cmd_full}
+            explain = cmd_full.get("explain")
+        else:
+            command, explain = _direct_flight_command(rates, atlas)
+            bridge_note = ("DIRECT command, NOT the connectome bridge: flylab.bridge has no flight mapping in this "
+                           "export. takeoff = 1 if the mean giant-fiber (GF) rate is at least "
+                           f"{DIRECT_GF_MIN_HZ:.0f} Hz, else 0; thrust fixed. Only the takeoff trigger comes from the brain model.")
+        res = precomputed if precomputed is not None else flight.simulate_flight(
+            command, duration_s=duration_s, seed=seed, record_poses=True)
+        adapter = {"type": "flight_command", "values": command, "explain": explain}
+        if bridge_note:
+            adapter["note"] = bridge_note
         geometry = "flybody"
     else:
         drv_full = bridge.rates_to_drive(rates)
@@ -550,13 +670,15 @@ def export_run(run_id: str, excite: list[str], silence: list[str] | None = None,
         "control_every", "descending_signal") if k in res}
 
     spec_gt = _ground_truth(gt)
+    if spec_gt is not None and gt_note:
+        spec_gt["note"] = gt_note
     out = {
         "format": "flylab-run-v1",
         "id": run_id, "title": title or run_id, "kind": kind, "mode": mode,
         "label": "RECORDED simulation replay - not a live re-computation",
         "created": datetime.now().isoformat(timespec="seconds"), "git_rev": _git_rev(),
         "reproduce": f"uv run python -m flylab.export3d --runs {run_id}",
-        "stimulus": {"excite": excite, "silence": silence, "excite_rate_hz": EXCITE_RATE_HZ,
+        "stimulus": {"excite": excite, "silence": silence, "excite_rate_hz": rate_hz,
                      "n_excited": len(ex_ids), "n_silenced": len(si_ids)},
         "brain": {
             "model": "flylab.brain: whole-brain LIF after Shiu et al. 2024 (Nature, doi:10.1038/s41586-024-07763-9), FlyWire v783",
@@ -574,8 +696,9 @@ def export_run(run_id: str, excite: list[str], silence: list[str] | None = None,
                              if isinstance(r, dict) and "rate_hz" in r else r)
                          for b, r in (readouts or {}).items()},
         },
-        "bridge": {**adapter, "frozen": "flylab.bridge mapping is hand-designed and fixed before these runs "
-                                         "(ventral nerve cord not simulated)"},
+        "bridge": {**adapter, "frozen": ("flylab.bridge mapping is hand-designed and fixed before these runs "
+                                         "(ventral nerve cord not simulated)") if not bridge_note else
+                   "direct command, not the frozen bridge (ventral nerve cord not simulated)"},
         "body": {"model": geometry, "geometry": f"data/geometry/{geometry}.json", "duration_s": duration_s,
                  "metrics": body_metrics,
                  "trajectory": [[_r(v, 4) for v in row] for row in trajectory],
@@ -586,6 +709,11 @@ def export_run(run_id: str, excite: list[str], silence: list[str] | None = None,
         "agent": _agent_context({"kind": kind, "excite": excite}),
         "export_runtime_s": round(time.perf_counter() - t0, 2),
     }
+    val = _flight_validation(condition, res) if mode == "flight" else None
+    if val:
+        out["validation"] = val["validation"]
+        if val.get("verifier"):
+            out["verifier"] = val["verifier"]
     path = _write_json(RUNS / f"{run_id}.json", out)
     return path.as_posix()
 
@@ -600,7 +728,19 @@ def write_index() -> str:
             d = json.loads(p.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
             continue
+        if d.get("kind") == "test" or str(d.get("id", "")).startswith("zz_"):
+            continue  # spike / test runs are never listed in the public viewer
+        g = d.get("ground_truth")
+        if g and "effect" not in g and g.get("id"):  # runs exported before the effect field existed
+            fresh = _ground_truth(g["id"])
+            if fresh:
+                d["ground_truth"] = {**fresh, **{k: v for k, v in g.items() if k == "note"}}
+                _write_json(p, d)
         v = d.get("verifier") or {}
+        if v.get("available") and "benchmark" not in v:  # runs exported before the benchmark pointer existed
+            v["benchmark"] = _verifier_benchmark()
+            d["verifier"] = v
+            _write_json(p, d)
         runs.append({"id": d["id"], "title": d.get("title"), "mode": d.get("mode"), "kind": d.get("kind"),
                      "file": _rel(p), "behavior": (d.get("body") or {}).get("metrics", {}).get("behavior"),
                      "expected": d.get("expected_behavior"), "verdict": v.get("final_verdict"),
@@ -641,7 +781,9 @@ def export_all(run_ids: list[str] | None = None, *, geometry: bool = True, brain
         try:
             out["runs"][rid] = export_run(rid, spec["excite"], spec.get("silence"), mode=spec["mode"],
                                           expected=spec.get("expected"), gt=spec.get("gt"),
-                                          title=spec.get("title"), kind=spec.get("kind", "validation"))
+                                          title=spec.get("title"), kind=spec.get("kind", "validation"),
+                                          gt_note=spec.get("gt_note"), excite_rate_hz=spec.get("rate"),
+                                          condition=spec.get("condition"))
             print(f"[export3d] {rid}: {time.perf_counter() - t:.1f} s", flush=True)
         except Exception as exc:  # noqa: BLE001
             out["skipped"][rid] = f"{type(exc).__name__}: {exc}"[:300]

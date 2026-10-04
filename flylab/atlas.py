@@ -52,10 +52,12 @@ DOI_SCHLEGEL_2024 = "10.1038/s41586-024-07686-5"   # FlyWire whole-brain annotat
 DOI_STURNER_2025 = "10.1038/s41586-025-08925-z"    # DN/AN matching FlyWire <-> light microscopy
 DOI_SHIU_2024 = "10.1038/s41586-024-07763-9"       # whole-brain LIF model
 
-BEHAVIORS = ("forward", "backward", "turn_left", "turn_right", "stop", "escape", "groom", "feed")
+BEHAVIORS = ("forward", "backward", "turn_left", "turn_right", "stop", "escape", "groom", "feed", "flight_power")
+# flight labels of flylab.flight.classify_flight; for 'escape' ground truth any takeoff counts as escape (see evaluate())
+FLIGHT_LABELS = ("no_takeoff", "takeoff_fall", "hover", "climb", "forward_flight", "flight_turn_left", "flight_turn_right")
 
 __all__ = ["groups", "group_ids", "find_cell_type", "ground_truth", "neuron_info", "groups_for_behavior",
-           "load_annotations", "build", "resolve_group", "evaluate"]
+           "load_annotations", "build", "resolve_group", "evaluate", "FLIGHT_LABELS"]
 
 
 # ----------------------------------------------------------------------------- loading
@@ -136,6 +138,14 @@ def evaluate(observed_behavior: str, ground_truth_id: str) -> dict:
     effect = e.get("effect", "induce")
     out = {"id": ground_truth_id, "observed": obs, "expected_behavior": exp, "effect": effect,
            "readout_group": e.get("readout_group")}
+    if obs in FLIGHT_LABELS:
+        # flight body labels are only comparable with 'escape' ground truth: takeoff (any label except
+        # no_takeoff, including a fall after takeoff) counts as escape, no_takeoff as no escape.
+        if exp != "escape":
+            return {**out, "verdict": "not_comparable",
+                    "reason": f"flight label '{obs}' can only be compared with escape (takeoff) ground truth, not '{exp}'"}
+        obs = "escape" if obs != "no_takeoff" else "no_escape"
+        out["observed_class"] = obs
     if exp not in BODY_BEHAVIORS and obs in BODY_BEHAVIORS:
         return {**out, "verdict": "not_comparable",
                 "reason": f"'{exp}' cannot be produced by the walking body; compare brain-level firing of "
@@ -293,6 +303,13 @@ _GROUP_SPECS: list[dict] = [
          description="Giant fiber (DNp01); activation elicits jump/escape takeoff.",
          citations=["10.1016/j.cell.2005.02.004", "10.1038/nn.3741"],
          confidence=("high", "FlyWire cell_type 'DNp01' with hemibrain_type 'Giant Fiber'.")),
+    dict(name="DNg02", sel={"cell_type_regex": r"^DNg02"}, role="descending", function="flight motor regulation (wingbeat amplitude, population code)",
+         description="DNg02 descending neurons (cell types DNg02_a..h); projecting to the dorsal flight neuropil of the VNC; "
+                     "activating more cells raises wingbeat amplitude (Namiki et al. 2022, Curr Biol).",
+         citations=["10.1016/j.cub.2022.01.008", DOI_SCHLEGEL_2024],
+         confidence=("medium", "FlyWire v783 cell_type 'DNg02_a' ... 'DNg02_h' (25 neurons, 13 left / 12 right, super_class descending, all in the "
+                     "brain model). Namiki et al. 2022 (abstract) describe 'a population of at least 15 DNg02 cell pairs'; the FlyWire count is "
+                     "lower, and we identify the population by cell-type name only (no morphological matching here).")),
     # ---- grooming descending neurons
     dict(name="DNg11", sel={"cell_type": "DNg11"}, role="descending", function="anterior grooming",
          description="DNg11; named among DNs for anterior grooming sequences (Stürner et al. 2025 intro, citing prior work).",
@@ -392,7 +409,7 @@ _GROUP_SPECS: list[dict] = [
 ]
 
 # Groups that are split into _L / _R in addition to the bilateral group.
-_SPLIT_SIDES = {"MDN", "P9", "DNa01", "DNa02", "GF", "DNg11", "DNg07", "sugar_GRN", "bitter_GRN", "water_GRN",
+_SPLIT_SIDES = {"MDN", "P9", "DNa01", "DNa02", "GF", "DNg02", "DNg11", "DNg07", "sugar_GRN", "bitter_GRN", "water_GRN",
                 "JO_CE", "LPLC2", "LC16", "LC4", "LC6", "aBN1", "MN9"}
 
 
@@ -642,12 +659,41 @@ _GT_SPECS: list[dict] = [
          readout_group="GF",
          note="The two loom-like LC types of the abstract are LC6 (jumping) and LC16 (backward walking) per the full text. GF readout is our "
               "suggestion; Wu et al. did not test GF dependence."),
+    # ---- flight (added for the embodied flight validation, flylab/flight.py)
+    dict(id="gt24_gf_activate_takeoff_vonreyn", manipulation="activate", target_group="GF", expected_behavior="escape", effect="induce",
+         context="looming-evoked escape takeoff (head-fixed GF recordings)",
+         doi="10.1038/nn.3741",
+         evidence="the GF circuit has a higher activation threshold than the parallel circuits, but can override ongoing behavior to force a short takeoff",
+         confidence="medium",
+         readout_group="GF",
+         note="von Reyn et al. 2014 recorded the GF during looming-evoked escape (spike timing selects short vs. long takeoff); it is not a direct "
+              "GF-activation experiment (that is Lima & Miesenboeck 2005, gt07). In the paper the GF-driven short takeoff sacrifices flight "
+              "stability and the parallel (non-GF) circuits give the long takeoff that initiates stable flight - the model's single 'takeoff' "
+              "label does not distinguish the two modes."),
+    dict(id="gt25_lplc2_gf_input_ache", manipulation="activate", target_group="LPLC2", expected_behavior="escape", effect="induce",
+         context="anatomical GF input (EM); behavioural LPLC2 activation -> jumping is gt08 (Wu et al. 2016)",
+         doi="10.1016/j.cub.2019.01.079",
+         evidence="LPLC2 and LC4 synapse directly onto the GF",
+         confidence="medium",
+         readout_group="GF",
+         note="Ache et al. 2019 abstract: anatomical (EM reconstruction) direct LPLC2 -> GF synapses and LPLC2 necessary for GF-mediated escape "
+              "(gt09); the abstract contains no LPLC2 activation experiment. The mechanistic prediction for the brain model is: LPLC2 activation "
+              "drives GF firing and thereby takeoff; the behavioural activation result (jumping) is Wu et al. 2016 (gt08)."),
+    dict(id="gt26_dng02_activate_wingbeat_amplitude", manipulation="activate", target_group="DNg02", expected_behavior="flight_power", effect="induce",
+         context="flying fly (optogenetic activation of different numbers of DNg02 cells)",
+         doi="10.1016/j.cub.2022.01.008",
+         evidence="these neurons regulate wingbeat amplitude over a wide dynamic range via a population code",
+         confidence="medium",
+         note="Namiki et al. 2022 (Curr Biol): population of DNg02 cells; more activated cells -> larger wingbeat amplitude. Our bridge uses exactly "
+              "this population code (mean activation over all DNg02 neurons), so a body check against this entry is partly circular. "
+              "FlyWire v783 holds 25 DNg02 neurons vs. 'at least 15 cell pairs' in the paper (medium confidence in the identification)."),
 ]
 
 
 _BEHAVIOR_TEXT = {"forward": "forward walking", "backward": "backward walking", "turn_left": "left turning",
                   "turn_right": "right turning", "stop": "stopping", "escape": "escape (takeoff/jump)",
-                  "groom": "grooming", "feed": "feeding initiation (proboscis extension)"}
+                  "groom": "grooming", "feed": "feeding initiation (proboscis extension)",
+                  "flight_power": "increased wingbeat amplitude (flight power)"}
 
 
 def _outcome_text(manipulation: str, behavior: str, effect: str) -> str:

@@ -1,7 +1,8 @@
 # Omnigent in the Embodied Fly Lab
 
 Omnigent 0.16 (Databricks' open-source agent meta-harness) orchestrates the live discovery
-loop: a PI/supervisor agent dispatches 7 specialist sub-agents, they call typed Python tools
+loop: a PI/supervisor agent dispatches 8 specialist sub-agents (literature, hypothesis, planner, safety, runner,
+**movement_verifier**, analysis, record_keeper), they call typed Python tools
 (`flylab/tools.py`), every step lands in a shared research record, and **policies enforced by
 Omnigent's policy engine** (not just prompts) gate cost and expensive simulations behind
 human approval.
@@ -13,7 +14,8 @@ human approval.
 | `agents/anthropic_ws_proxy.py` | Local proxy (127.0.0.1:8788) that adds the `anthropic-workspace-id` header (see Credentials) |
 | `agents/run_lab.py` | Scripted full-lab run: stock `omnigent run -p`, but follows the whole sub-agent tree, then exports transcripts |
 | `agents/export_transcript.py` | Exports supervisor + all sub-agent sessions to `runs/<run_id>/omnigent/` |
-| `flylab/tools.py` | 19 function tools + policy factories `approval_gate`, `loop_guard`; `FLYLAB_MOCK` support |
+| `flylab/tools.py` | 23 function tools (incl. `run_embodied_flight`, `run_flight_experiment`, `verify_movement`, `run_experiments_parallel`) + policy factories `approval_gate`, `loop_guard`; `FLYLAB_MOCK` support |
+| `flylab/verify.py` | Movement verifier behind `verify_movement`: kinematics recomputed from the raw trajectory + blind Claude-vision check of a keyframe contact sheet (walk and flight) |
 | `flylab/record.py` | Research record `runs/<run_id>/record.jsonl` + `artifacts/` |
 | `spikes/omni/validate_yaml.py` | Loads/validates the YAML with Omnigent's own loader, checks runtime tool schemas |
 | `spikes/omni/test_policies.py` | Runs the YAML policies through Omnigent's policy plumbing (no LLM needed) |
@@ -28,9 +30,15 @@ $env:FLYLAB_MOCK = "1"; uv run python -m flylab.tools --selftest; Remove-Item En
 uv run python spikes/omni/validate_yaml.py
 uv run python spikes/omni/test_policies.py
 
-# 1) DEMO: full live discovery loop, scripted (Max pre-approves the gated actions by launching it)
-#    ~10-20 min, real brain screen + embodied run; prints the session URL (watch it live in the browser)
+# 1) DEMO (flight / giant fiber): full live discovery loop with the movement verifier, scripted
+#    (the human pre-approves the gated actions by launching it with -ApproveAtLaunch; recorded in the run)
+#    ~9 min, ~$1.1 of LLM spend, real brain screen + flying body + verifier; prints the session URL
+powershell -ExecutionPolicy Bypass -File .\agents\omni.ps1 -ApproveAtLaunch lab "Which visual neurons trigger escape takeoff through the giant fiber, does the simulated body actually take off, and is the giant fiber necessary?"
+#    The same loop for the walking body (backward walking / moonwalker):
 powershell -ExecutionPolicy Bypass -File .\agents\omni.ps1 -ApproveAtLaunch lab "Which visual projection neurons drive backward walking (retreat) in Drosophila, and is the moonwalker pathway necessary?"
+#    After the run: runs/CURRENT points at the new run; inspect it with
+uv run python -m flylab.record --list
+uv run python -m flylab.record --show (Get-Content runs\CURRENT)
 
 # 2) Same lab in the WEB UI with real human approval cards (best for the video)
 powershell -ExecutionPolicy Bypass -File .\agents\omni.ps1 server --agent agents/fly_lab.yaml
@@ -94,13 +102,19 @@ fly_lab (PI / supervisor) --start_run--> runs/<run_id>/record.jsonl  <-- every t
    +--> hypothesis     rank_candidates (connectome prior over 326 VPN types -> MDN), log_hypothesis (agent-generated)
    +--> planner        estimate_cost, get_benchmark, log_experiment_plan (>= 2 options: exhaustive vs guided screen ...)
    +--> safety         request_approval  ==> POLICY ASK -> human approves/denies
-   +--> runner         run_brain_screen | run_brain_experiment | run_embodied_experiment (==> POLICY ASK)
-   +--> analysis       compare_to_ground_truth (verdict + DOI), get_benchmark, flags surprises
+   +--> runner         run_brain_screen | run_brain_experiment | run_embodied_experiment (walking) |
+   |                  run_embodied_flight (flying body, takeoff) | run_experiments_parallel   (embodied ==> POLICY ASK)
+   +--> movement_verifier  verify_movement: kinematics from the raw trajectory + blind vision on the video -> correct/incorrect/uncertain
+   +--> analysis       compare_to_ground_truth (verdict + DOI + verifier verdict; flight labels: any takeoff = escape), get_benchmark, flags surprises
    |      log_decision(reopens_assumption=...) --> cycle 2: necessity (hit + MDN silenced vs control)   [max 2 cycles]
    +--> record_keeper  get_record audit + final report (log_note type decision)
 ```
 
 - Specialists get **only the tools of their role** (least privilege); the PI cannot run simulations.
+- Flight questions: the walking body cannot take off, so every embodied run must be `embodied_flight`
+  (`run_embodied_flight`: brain -> frozen adapter `flight-adapter-v1` -> `flylab.flight` FlyBody in MuJoCo).
+  The PI, planner, safety and runner prompts say so explicitly (added after a first live run used the
+  walking body for the necessity test, see "Lessons from the failed attempts").
 - Hand-offs are visible three times: Omnigent web UI (sub-agent sessions), the exported transcripts
   `runs/<run_id>/omnigent/*.jsonl` + `sessions.json` (tree), and the record (`agent` field of every event).
 - Tools resolve the run via explicit `run_id` > env `FLYLAB_RUN_ID` > `runs/CURRENT` (written by `start_run`).
@@ -136,11 +150,57 @@ Measured (Omnigent `total_cost_usd` of the root session, includes all sub-agents
   (current `runs/CURRENT`): **$1.21**, 552 s wall, 12 sessions, 2 cycles, 37 record events.
 - All live tests on 2026-10-04 together: about $2.61 (smoke $0.05, two aborted runs $0.33, demo $1.03, review run $1.21).
 
+Flight / movement-verifier run (2026-10-04 09:33, current `runs/CURRENT`, see "Demo runs"): root session
+**$1.11** (all 12 sessions), 550 s wall, 33 record events. The movement verifier's vision calls (claude-opus-5-5, one per
+video, cached by video hash) are billed directly by the tool, not by Omnigent, about $0.02-0.04 each.
+Live spend of this work stream on 2026-10-04: $2.71 Omnigent-tracked (this run $1.11 plus two failed attempts,
+about $1.2 aborted + $0.5 crashed, see "Lessons from the failed attempts") plus about 4 vision calls.
+
 Note: the root session's spend crossed $1 in the final step of that run. The ASK threshold was therefore
 raised from $1 to $2 (review 01:20), otherwise a scripted run stalls at the end; the $3 hard stop stays.
 
 ## Demo runs (reference)
-**Current (`runs/CURRENT`): `runs/20261004-010600-which-visual-projection-neurons-ebe8/`** - after the review
+
+### Current (`runs/CURRENT`): flight / giant-fiber run `runs/20261004-093251-which-visual-neurons-trigger-esc-9460/`
+Question: *"Which visual neurons trigger escape takeoff through the giant fiber, does the simulated body actually take off,
+and is the giant fiber necessary?"* Launched with `omni.ps1 -ApproveAtLaunch lab "<question>"` (the human pre-approval at
+launch is the documented human-approval route for scripted runs; the record's 2 `approval` events say "PRE-APPROVED by
+mkahl (human) at launch ... caps still enforced"). 550 s wall, root cost $1.11, 12 Omnigent sessions, 33 record events,
+all data real (`mock=false`). Files: `record.jsonl`, `artifacts/` (screen_01, brain_01/02, flight_01/02 JSON + mp4 +
+contact sheets + `*_verify_*.json`), `omnigent/` (12 transcripts + `sessions.json`). Note: `*.mp4` is in `.gitignore`.
+
+Loop as it ran (handoffs from the record): human -> supervisor -> literature + hypothesis (parallel) -> planner ->
+safety -> runner -> movement_verifier -> analysis -> supervisor -> planner -> safety -> runner -> supervisor -> record_keeper.
+- **Literature** (DOIs from tools): LPLC2 and LC4 synapse onto GF (10.1016/j.cub.2019.01.079), several VPNs evoke jumping
+  (10.7554/eLife.21022), GF timing and takeoff (10.1038/nn.3741), GF photostimulation (10.1016/j.cell.2005.02.004).
+- **Hypotheses** H1-H3, all labelled "agent-generated" (LPLC2 -> GF -> takeoff; LC15 and others indirect = gap probe;
+  GF silencing abolishes the takeoff).
+- **Planner**: 3 options with cost units and expected information gain against a 10-unit budget; the exhaustive 326-type
+  screen was priced at 82.5 units and is denied by policy; chosen = connectome-guided 10-candidate screen + a flight pair.
+- **Runner (R6 parallel)**: screen of 10 candidates; the two embodied flights (LPLC2, LPLC2 + GF silenced) in one
+  `run_experiments_parallel` call: 21.0 s wall vs 30.6 s summed (1.46x; brain parts overlap, body renders are serialized).
+- **Results**: LPLC2 -> GF 158 Hz, takeoff command 0.992, the body takes off (airborne 0.06 s after start, max height
+  18.2 mm, net displacement [19.8, 3.3, 17.7] mm, label `hover`); with GF silenced GF = 0 Hz, command 0, `no_takeoff`,
+  displacement 0. Screen (GF rate, Hz): LC6 159, LPLC2 159, LC17 130, LC4 110.5, LC15 99.5; **all 10 candidates were hits
+  (>= 5 Hz), so the hit criterion does not discriminate** (ceiling). Seed-2 brain replicate: GF 157 Hz (LPLC2) vs 0 Hz (GF silenced).
+- **Movement verifier**: flight_01 **uncertain** (kinematics correct: airborne 0.95 s; blind vision said `climb`, confidence
+  0.6 < 0.65 minimum); flight_02 **correct** against `no_takeoff` (kinematics + vision agree, 0.75). The first check of
+  flight_02 against H3's predicted "escape" is logged `incorrect`: H3's `predicted_behavior` was the abolished behaviour, the
+  verifier then re-ran with `no_takeoff`. Both entries stay in the record.
+- **Analysis**: gt08 (LPLC2 activation -> escape) consistent at brain level, body movement UNVERIFIED (verifier uncertain);
+  gt22 (LC4) and gt23 (LC6) consistent by brain-readout inference only (no body run, 1 seed); gt09 (LPLC2 silencing)
+  inconclusive (the run silenced GF, not LPLC2); gt07 (GF activation) not tested.
+- **Supervisor decisions that changed the next step (R7/R13)**: after cycle 1 it reopened "the bridge turns a GF rate into a
+  reliably labelled escape movement" and "GF >= 5 Hz is a meaningful hit criterion"; cycle 2 therefore became a brain-level
+  necessity replicate (seed 2, +/- GF silencing) instead of repeating the flight pair. The planner then (mis)read the 10-unit
+  budget as cumulative and priced the second flight pair out, so cycle 2 had no body run and no verifier call.
+- **Necessity (honest reading)**: "GF silenced -> no takeoff" is true **by design** (takeoff is wired to GF in the frozen
+  adapter `flight-adapter-v1`); it checks the pipeline, it is not a biological finding. Real flies also take off via non-GF circuits
+  (von Reyn 2014). Open loop, n = 1 seed per body run; the record keeper's wording "VALIDATED" for gt22/gt23 is stronger than the
+  tool verdict ("consistent via brain readout") - cite the tool verdicts.
+
+### Previous walking run (`runs/20261004-010600-which-visual-projection-neurons-ebe8/`)
+Kept for reference; it ran before the movement verifier and flight body existed. After the review
 fixes (3-hop prior, per-target hits, experiment_ref checks). Connectome prior ranks LPC1, LT82b, LC6 top and
 LC16 16/326; screen MDN hits: LPC1, LT82b, LC6, LC18, LC4, LC9, LC16; LPLC2 drives GF 159 Hz, MDN 0 Hz
 (gt19 inconsistent = surprise; gt08 escape consistent at brain level); the LC16 embodied run moves
@@ -148,7 +208,7 @@ LC16 16/326; screen MDN hits: LPC1, LT82b, LC6, LC18, LC4, LC9, LC16; LPLC2 driv
 gt02 (MDN silencing) is flagged by construction. Caveat in this run: cycle-2 "seed replicates" were
 identical because the tools had no seed parameter then (fixed afterwards: `seed` on brain/embodied/screen tools).
 
-Older run `runs/20261004-005152-which-visual-projection-neurons-908e/` (before the review fixes; its record
+Older run `runs/20261004-005152-which-visual-projection-neurons-908e/` (not kept locally; before the review fixes; its record
 logs gt01/gt18 "MDN activation -> backward: consistent" from an LC16 run and "observed backward" where the body
 classifier said `stop` - do not cite those verdicts): `record.jsonl` (hand-offs human ->
 supervisor -> literature -> hypothesis -> planner -> safety -> runner -> analysis -> supervisor ->
@@ -156,6 +216,31 @@ planner -> safety -> runner -> analysis -> supervisor -> record_keeper), `artifa
 embodied JSON + mp4), `omnigent/` (12 transcripts + `sessions.json`). Highlights: connectome prior
 ranked LC16 295/326 yet the screen hit it (MDN 32 Hz, embodied backward drift -1.22 mm); LPLC2 drove
 GF (159 Hz) not MDN -> surprise -> plan update -> cycle 2 necessity test (LC16 +/- MDN silencing).
+
+## Lessons from the failed attempts (2026-10-04, all fixed)
+1. **Wrong body in cycle 2** (run aborted at 09:21, ~$1.2): the planner priced options as `embodied`, so safety and runner used the
+   walking body for the GF necessity test (`behavior=stop`, verifier `incorrect`). Fixes: `estimate_cost` knows `embodied_flight`/`flight`;
+   PI, planner, safety, runner and verifier prompts name `embodied_flight` / `run_embodied_flight` explicitly for flight questions.
+2. **Runner crash** (09:27, $0.48): two flights rendering in parallel threads of `run_experiments_parallel` killed the Omnigent
+   runner process (access violation, GLFW "Failed to register window class"; MuJoCo's GLFW renderer is not thread-safe on Windows).
+   Fix: `_BODY_LOCK` in `flylab/tools.py` serializes body simulations (walking and flight); brain simulations still overlap.
+3. **Flight labels rejected by `compare_to_ground_truth`** ("observed label 'hover' is not one of ..."): now accepted; any takeoff
+   label counts as `escape`, `no_takeoff` as no escape (same rule as `atlas.evaluate`); movement-verifier verdicts are matched
+   through that class; `verify_movement` / `compare_to_ground_truth` also resolve abbreviated ground-truth ids ("gt08").
+4. Remaining weakness: the planner treats the 10-unit budget as cumulative over cycles (it is per cycle) when it sees the cycle-1 spend;
+   this cost the second cycle its body run in the current run. Not changed (time).
+
+## Flight tools and the movement verifier (what they do)
+- `run_embodied_flight` = connectome brain -> `bridge.rates_to_flight_command` (frozen `flight-adapter-v1`, parameter hash
+  `02ef23b1b5d6dca2`: GF -> takeoff trigger, DNg02 -> wingbeat amplitude, DNa01/DNa02 asymmetry -> yaw (transfer assumption)) ->
+  `flylab.flight.simulate_flight` (FlyBody in MuJoCo, quasi-steady aerodynamics, hand-built attitude stabiliser). No mock fallback any
+  more: a failing flight module returns an error result; mock data appears only when `FLYLAB_MOCK` includes `flight`/`bridge`.
+- `run_flight_experiment` = flight body only, explicit command (body-only control, G4).
+- `verify_movement` (agent `movement_verifier`) = two independent checks (`flylab/verify.py`): kinematics recomputed from the raw
+  trajectory with its own thresholds (not the body classifier) and a blind vision call on a keyframe contact sheet (the model sees
+  neither the expected behaviour nor the numbers; confidence < 0.65 counts as unclear). `final_verdict = correct` only if both agree;
+  a disagreement stays `uncertain` and is reported as a finding, never upgraded. Verdicts land in the record as
+  `movement_verification` events and in `artifacts/<run>_verify_<expected>.json`.
 
 ## Where things are stored
 

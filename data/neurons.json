@@ -9,7 +9,7 @@
    "10.1038/s41586-025-08925-z"
   ],
   "shiu_model_code": "https://github.com/philshiu/Drosophila_brain_model",
-  "built": "2026-10-04 00:40",
+  "built": "2026-10-04 08:47",
   "notes": [
    "Groups ending in _shiu2024 reuse the exact neuron IDs from the Shiu et al. model code (v630 IDs that persist unchanged in v783).",
    "Left/right: Shiu et al. (v630 era) label the sugar/bitter/water sets 'right hemisphere'; the v783 annotation 'side' for the same IDs is 'left'. We always report the v783 annotation side.",
@@ -456,6 +456,159 @@
     "reason": "FlyWire cell_type 'DNp01' with hemibrain_type 'Giant Fiber'."
    },
    "mapping_source": "https://github.com/flyconnectome/flywire_annotations (Supplemental_file1_neuron_annotations.tsv); selector {'cell_type': 'DNp01'}",
+   "side_convention": "FlyWire v783 annotation 'side' (soma side for brain neurons, nerve-entry side for sensory neurons).",
+   "brain_model_check": "all root_ids are present in Completeness_783.csv (Shiu et al. model neuron list)"
+  },
+  "DNg02": {
+   "root_ids": [
+    720575940610863310,
+    720575940612014131,
+    720575940612804606,
+    720575940613668620,
+    720575940613793170,
+    720575940615679282,
+    720575940617498507,
+    720575940617922439,
+    720575940622042603,
+    720575940622681864,
+    720575940622910188,
+    720575940625144061,
+    720575940625482954,
+    720575940626278129,
+    720575940626377349,
+    720575940626904219,
+    720575940627414887,
+    720575940627850622,
+    720575940628942586,
+    720575940630289804,
+    720575940630492714,
+    720575940632573887,
+    720575940639201443,
+    720575940641305229,
+    720575940647964281
+   ],
+   "cell_type": "8 types",
+   "side": "both",
+   "role": "descending",
+   "function": "flight motor regulation (wingbeat amplitude, population code)",
+   "description": "DNg02 descending neurons (cell types DNg02_a..h); projecting to the dorsal flight neuropil of the VNC; activating more cells raises wingbeat amplitude (Namiki et al. 2022, Curr Biol).",
+   "citations": [
+    "10.1016/j.cub.2022.01.008",
+    "10.1038/s41586-024-07686-5"
+   ],
+   "n": 25,
+   "cell_type_counts": {
+    "DNg02_b": 7,
+    "DNg02_a": 6,
+    "DNg02_h": 2,
+    "DNg02_f": 2,
+    "DNg02_g": 2,
+    "DNg02_c": 2,
+    "DNg02_e": 2,
+    "DNg02_d": 2
+   },
+   "sides_present": [
+    "L",
+    "R"
+   ],
+   "confidence": {
+    "level": "medium",
+    "reason": "FlyWire v783 cell_type 'DNg02_a' ... 'DNg02_h' (25 neurons, 13 left / 12 right, super_class descending, all in the brain model). Namiki et al. 2022 (abstract) describe 'a population of at least 15 DNg02 cell pairs'; the FlyWire count is lower, and we identify the population by cell-type name only (no morphological matching here)."
+   },
+   "mapping_source": "https://github.com/flyconnectome/flywire_annotations (Supplemental_file1_neuron_annotations.tsv); selector {'cell_type_regex': '^DNg02'}",
+   "side_convention": "FlyWire v783 annotation 'side' (soma side for brain neurons, nerve-entry side for sensory neurons).",
+   "brain_model_check": "all root_ids are present in Completeness_783.csv (Shiu et al. model neuron list)"
+  },
+  "DNg02_L": {
+   "root_ids": [
+    720575940612014131,
+    720575940613668620,
+    720575940613793170,
+    720575940622042603,
+    720575940622681864,
+    720575940626278129,
+    720575940626377349,
+    720575940626904219,
+    720575940627850622,
+    720575940628942586,
+    720575940630289804,
+    720575940639201443,
+    720575940641305229
+   ],
+   "cell_type": "8 types",
+   "side": "L",
+   "role": "descending",
+   "function": "flight motor regulation (wingbeat amplitude, population code)",
+   "description": "DNg02 descending neurons (cell types DNg02_a..h); projecting to the dorsal flight neuropil of the VNC; activating more cells raises wingbeat amplitude (Namiki et al. 2022, Curr Biol). (left side only)",
+   "citations": [
+    "10.1016/j.cub.2022.01.008",
+    "10.1038/s41586-024-07686-5"
+   ],
+   "n": 13,
+   "cell_type_counts": {
+    "DNg02_b": 4,
+    "DNg02_a": 3,
+    "DNg02_f": 1,
+    "DNg02_c": 1,
+    "DNg02_g": 1,
+    "DNg02_e": 1,
+    "DNg02_h": 1,
+    "DNg02_d": 1
+   },
+   "sides_present": [
+    "L"
+   ],
+   "confidence": {
+    "level": "medium",
+    "reason": "FlyWire v783 cell_type 'DNg02_a' ... 'DNg02_h' (25 neurons, 13 left / 12 right, super_class descending, all in the brain model). Namiki et al. 2022 (abstract) describe 'a population of at least 15 DNg02 cell pairs'; the FlyWire count is lower, and we identify the population by cell-type name only (no morphological matching here)."
+   },
+   "mapping_source": "https://github.com/flyconnectome/flywire_annotations (Supplemental_file1_neuron_annotations.tsv); selector {'cell_type_regex': '^DNg02'}",
+   "side_convention": "FlyWire v783 annotation 'side' (soma side for brain neurons, nerve-entry side for sensory neurons).",
+   "brain_model_check": "all root_ids are present in Completeness_783.csv (Shiu et al. model neuron list)"
+  },
+  "DNg02_R": {
+   "root_ids": [
+    720575940610863310,
+    720575940612804606,
+    720575940615679282,
+    720575940617498507,
+    720575940617922439,
+    720575940622910188,
+    720575940625144061,
+    720575940625482954,
+    720575940627414887,
+    720575940630492714,
+    720575940632573887,
+    720575940647964281
+   ],
+   "cell_type": "8 types",
+   "side": "R",
+   "role": "descending",
+   "function": "flight motor regulation (wingbeat amplitude, population code)",
+   "description": "DNg02 descending neurons (cell types DNg02_a..h); projecting to the dorsal flight neuropil of the VNC; activating more cells raises wingbeat amplitude (Namiki et al. 2022, Curr Biol). (right side only)",
+   "citations": [
+    "10.1016/j.cub.2022.01.008",
+    "10.1038/s41586-024-07686-5"
+   ],
+   "n": 12,
+   "cell_type_counts": {
+    "DNg02_a": 3,
+    "DNg02_b": 3,
+    "DNg02_h": 1,
+    "DNg02_g": 1,
+    "DNg02_e": 1,
+    "DNg02_f": 1,
+    "DNg02_c": 1,
+    "DNg02_d": 1
+   },
+   "sides_present": [
+    "R"
+   ],
+   "confidence": {
+    "level": "medium",
+    "reason": "FlyWire v783 cell_type 'DNg02_a' ... 'DNg02_h' (25 neurons, 13 left / 12 right, super_class descending, all in the brain model). Namiki et al. 2022 (abstract) describe 'a population of at least 15 DNg02 cell pairs'; the FlyWire count is lower, and we identify the population by cell-type name only (no morphological matching here)."
+   },
+   "mapping_source": "https://github.com/flyconnectome/flywire_annotations (Supplemental_file1_neuron_annotations.tsv); selector {'cell_type_regex': '^DNg02'}",
    "side_convention": "FlyWire v783 annotation 'side' (soma side for brain neurons, nerve-entry side for sensory neurons).",
    "brain_model_check": "all root_ids are present in Completeness_783.csv (Shiu et al. model neuron list)"
   },

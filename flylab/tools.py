@@ -131,6 +131,11 @@ def _err(tool: str, exc: BaseException, run_id: str | None = None, agent: str = 
 
 
 _ARTIFACT_LOCK = threading.Lock()
+# MuJoCo bodies render through GLFW, which is NOT thread-safe on Windows: two flights rendering in worker threads of
+# run_experiments_parallel crashed the Omnigent runner process (access violation, 2026-10-04 09:27, GLFWError "Failed
+# to register window class"). Body simulations (walking + flight) therefore run one at a time; brain simulations of a
+# parallel batch still overlap.
+_BODY_LOCK = threading.Lock()
 
 
 def _next_artifact(run_id: str, prefix: str, ext: str) -> Path:
@@ -359,7 +364,8 @@ def _simulate_body(drive: dict, duration_s: float, render_path: str | None, seed
     if _mock("body"):
         return _mock_body(clean, duration_s)
     from flylab import body
-    return body.simulate_walk(clean, duration_s=float(duration_s), render_path=render_path, seed=int(seed))
+    with _BODY_LOCK:
+        return body.simulate_walk(clean, duration_s=float(duration_s), render_path=render_path, seed=int(seed))
 
 
 def _rel(p: str | None) -> str | None:
@@ -577,7 +583,8 @@ def log_hypothesis(statement: str, manipulation: str, target_groups: list, predi
 def estimate_cost(kind: str, duration_ms: float = 1000.0, n_trials: int = 3, duration_s: float = 1.0,
                   n_candidates: int = 1) -> dict:
     """Rough compute-cost estimate for an experiment, used by the planner to trade off information vs cost.
-    :param kind: "brain", "body", "embodied", "screen" (run_brain_screen over n_candidates cell types) or
+    :param kind: "brain", "body", "embodied" (brain + WALKING body), "embodied_flight" (brain + FLYING body, escape /
+        takeoff questions), "flight" (flying body only), "screen" (run_brain_screen over n_candidates cell types) or
         "rank" (rank_candidates, connectome only).
     :param duration_ms: Simulated brain time per trial (ms) (screen default in run_brain_screen: 500).
     :param n_trials: Brain trials (screen default: 2).
@@ -594,16 +601,18 @@ def estimate_cost(kind: str, duration_ms: float = 1000.0, n_trials: int = 3, dur
     #         + ~10 s one-off connectome load (Phase 1 note: ~1 s wall per trial-second); rank: ~15 s incl. load.
     brain_s = 5.0 + 3.0 * duration_ms / 1000.0 * n_trials
     body_s = 25.0 * duration_s
+    flight_s = 18.0 * duration_s  # flylab.flight with video: measured 17-18 s wall per simulated second (2.3 s without video)
     n_c = max(1, int(n_candidates))
     screen_s = 10.0 + n_c * (1.0 + 1.5 * duration_ms / 1000.0 * n_trials)
     k = kind.strip().lower()
-    est = {"brain": brain_s, "body": body_s, "embodied": brain_s + body_s, "screen": screen_s, "rank": 15.0}.get(k)
+    est = {"brain": brain_s, "body": body_s, "embodied": brain_s + body_s, "embodied_flight": brain_s + flight_s,
+           "flight": flight_s, "screen": screen_s, "rank": 15.0}.get(k)
     if est is None:
-        return {"ok": False, "error": f"unknown kind {kind!r}; use brain, body, embodied, screen or rank"}
+        return {"ok": False, "error": f"unknown kind {kind!r}; use brain, body, embodied, embodied_flight, flight, screen or rank"}
     units = round(est / 10.0, 2)
     return {"ok": True, "kind": k, "est_wall_s": round(est, 1), "cost_units": units,
             "n_candidates": n_c if k == "screen" else None,
-            "needs_approval": k == "embodied" or (k == "brain" and duration_ms * n_trials > 10000)
+            "needs_approval": k in ("embodied", "embodied_flight") or (k == "brain" and duration_ms * n_trials > 10000)
                               or (k == "screen" and n_c * duration_ms * n_trials > 10000),
             "denied_by_policy": k == "screen" and n_c > 40,
             "basis": "heuristic, calibrated on this laptop (brain validation runs, body.py notes); "
@@ -614,7 +623,7 @@ def log_experiment_plan(options: list, chosen_id: str, rationale: str, budget_un
                         agent: str = "planner", run_id: str = "") -> dict:
     """Record >=2 candidate experiments and the chosen one (expected information gain vs cost).
     :param options: List of candidate experiments, each an object like
-        {"id": "E1", "kind": "brain|body|embodied", "excite_groups": [...], "silence_groups": [...],
+        {"id": "E1", "kind": "brain|body|embodied|embodied_flight|flight|screen", "excite_groups": [...], "silence_groups": [...],
          "tests_hypothesis": "H1", "expected_information_gain": "high|medium|low" or 0..1,
          "est_cost_units": 1.2, "why": "..."}.
     :param chosen_id: id of the chosen option.
@@ -823,11 +832,13 @@ def run_embodied_experiment(excite_groups: list, silence_groups: list = None, ra
 
 
 # =========================================================================== flight tools (Phase 3)
-# flylab.flight (FlyBody wings in MuJoCo) and bridge.rates_to_flight_command were written concurrently with
-# these tools. Both are imported lazily. If a module/function is missing (or FLYLAB_MOCK includes "flight"),
-# the tools return CLEARLY LABELLED mock data ("mock": true + "mock_reason") - never silently fake results.
+# Real chain (finished 2026-10-04 08:55): connectome brain -> flylab.bridge.rates_to_flight_command (frozen adapter
+# "flight-adapter-v1") -> flylab.flight.simulate_flight (FlyBody wings in MuJoCo, quasi-steady aerodynamics).
+# There is NO silent fallback any more: a missing/failing flight module surfaces as an error result. Mock data is
+# only returned when FLYLAB_MOCK explicitly includes "flight" (resp. "bridge") - offline self-tests / smoke runs -
+# and is then CLEARLY LABELLED ("mock": true + "mock_reason").
 
-FLIGHT_REF_RATE_HZ = 148.3  # same reference rate as flylab.bridge (rates_to_drive)
+FLIGHT_REF_RATE_HZ = 148.3  # same reference rate as flylab.bridge (rates_to_drive); used by the mock bridge only
 
 
 def _mock_flight(command: dict, duration_s: float, reason: str) -> dict:
@@ -856,31 +867,26 @@ def _simulate_flight(command: dict, duration_s: float, render_path: str | None, 
     cmd = {k: float(command.get(k, 0.0) or 0.0) for k in ("takeoff", "thrust", "yaw", "pitch")}
     if _mock("flight"):
         return _mock_flight(cmd, duration_s, "FLYLAB_MOCK includes flight")
-    try:
-        from flylab import flight
-        fn = flight.simulate_flight
-    except (ImportError, AttributeError) as exc:
-        return _mock_flight(cmd, duration_s, f"flylab.flight not available yet ({type(exc).__name__})")
-    return fn(cmd, duration_s=float(duration_s), render_path=render_path, seed=int(seed))
+    from flylab import flight  # real flight body; errors propagate to the tool's error result (no silent mock)
+    with _BODY_LOCK:  # GLFW rendering is not thread-safe (see _BODY_LOCK)
+        return flight.simulate_flight(cmd, duration_s=float(duration_s), render_path=render_path, seed=int(seed))
 
 
 def _flight_command_from_rates(rates: dict[str, float]) -> tuple[dict, dict]:
-    """Per-neuron rates -> flight command via flylab.bridge.rates_to_flight_command (Phase 3 contract).
-    Fallback (labelled MOCK) while the bridge function does not exist: takeoff = GF mean rate / ref rate."""
-    try:
-        from flylab import bridge
-        fn = bridge.rates_to_flight_command
-    except (ImportError, AttributeError) as exc:
+    """Per-neuron rates -> flight command via the frozen adapter flylab.bridge.rates_to_flight_command.
+    Only with FLYLAB_MOCK including "bridge": labelled MOCK (takeoff = thrust = GF mean rate / ref rate)."""
+    if _mock("bridge"):
         g = _group_rates(rates, role=None)
         gf = max([v for k, v in g.items() if k == "GF" or k.startswith("GF_")] or [0.0])
         tk = round(min(gf / FLIGHT_REF_RATE_HZ, 1.0), 3)
         cmd = {"takeoff": tk, "thrust": tk, "yaw": 0.0, "pitch": 0.0}
-        return cmd, {"bridge": "MOCK flight bridge (bridge.rates_to_flight_command not available yet: "
-                               f"{type(exc).__name__}); takeoff = thrust = GF rate / {FLIGHT_REF_RATE_HZ} Hz",
+        return cmd, {"bridge": "MOCK flight bridge (FLYLAB_MOCK includes bridge); "
+                               f"takeoff = thrust = GF rate / {FLIGHT_REF_RATE_HZ} Hz",
                      "mock": True, "gf_rate_hz": gf}
-    cmd = fn(rates)
-    return cmd, {"bridge": "flylab.bridge.rates_to_flight_command",
-                 "explain": cmd.get("explain") if isinstance(cmd, dict) else None}
+    from flylab import bridge
+    cmd = bridge.rates_to_flight_command(rates)
+    ex = cmd.get("explain") if isinstance(cmd, dict) else None
+    return cmd, {"bridge": "flylab.bridge.rates_to_flight_command", "adapter": (ex or {}).get("frozen"), "explain": ex}
 
 
 def _flight_summary(res: dict) -> dict:
@@ -1056,7 +1062,8 @@ def _check_experiment_ref(rid: str, experiment_ref: str, entry: dict, obs: str) 
                 f"experiment(s) {manip} did not {entry.get('manipulation')} {tgt} - not a test of this entry.")
         if body_labels:
             out["body_label"] = body_labels[0] if len(set(body_labels)) == 1 else body_labels
-            if obs in body_labels:
+            fl = set(_flight_labels())
+            if obs in body_labels or (obs == "escape" and any(b in fl and b != "no_takeoff" for b in body_labels)):
                 out["label_source"] = "body_classifier"
             else:
                 out["label_source"] = "agent_override"
@@ -1069,10 +1076,24 @@ def _check_experiment_ref(rid: str, experiment_ref: str, entry: dict, obs: str) 
     return out
 
 
+def _flight_labels() -> tuple:
+    from flylab import atlas
+    return tuple(atlas.FLIGHT_LABELS)
+
+
+def _flight_class(label: str) -> str:
+    """Flight body label -> ground-truth class: takeoff labels (hover, climb, ...) -> 'escape', no_takeoff -> 'no_escape'.
+    Any other label is returned unchanged."""
+    label = str(label or "")
+    if label in _flight_labels():
+        return "no_escape" if label == "no_takeoff" else "escape"
+    return label
+
+
 def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experiment_ref: str = "",
                             control_behavior: str = "", agent: str = "analysis", run_id: str = "") -> dict:
     """Compare a simulated behavior with a published experimental result (activation: behavior should appear; silencing: behavior should be reduced vs. a control).
-    :param observed_behavior: Behavior label from the manipulated body/embodied run (forward, backward, turn_left, ...).
+    :param observed_behavior: Behavior label from the manipulated body/embodied run (forward, backward, turn_left, ...; flight runs: the flight label no_takeoff, hover, climb, forward_flight, flight_turn_left, flight_turn_right - any takeoff label counts as escape, no_takeoff as no escape).
     :param ground_truth_id: id from list_ground_truth.
     :param experiment_ref: Which run/artifact produced the observation (e.g. artifact path or record seq).
     :param control_behavior: For silencing entries: behavior of the matching control run WITHOUT the silencing (strongly recommended).
@@ -1085,6 +1106,7 @@ def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experi
     rid = _rid(run_id)
     try:
         gt = {str(e.get("id")): e for e in _ground_truth()}
+        ground_truth_id = _resolve_gt(ground_truth_id, gt) or ground_truth_id
         entry = gt.get(str(ground_truth_id))
         if entry is None:
             return {"ok": False, "error": f"unknown ground_truth_id {ground_truth_id!r}", "known_ids": sorted(gt)[:50]}
@@ -1095,9 +1117,17 @@ def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experi
         readout = entry.get("readout_group")
         note = ""
         comparable = True
-        if obs not in BEHAVIORS:
+        # Flight body labels (flylab.atlas.FLIGHT_LABELS) are comparable with 'escape' ground truth only: any takeoff
+        # label (hover, climb, ...) counts as escape, no_takeoff as no escape (same rule as atlas.evaluate).
+        obs_flight, ctrl_flight = obs in _flight_labels(), ctrl in _flight_labels()
+        obs_c, ctrl_c = _flight_class(obs), _flight_class(ctrl)
+        if obs not in BEHAVIORS and not obs_flight:
             verdict, comparable = "inconclusive", False
-            note = f"observed label {obs!r} is not one of {BEHAVIORS}; pass the body's behavior label."
+            note = (f"observed label {obs!r} is not one of {BEHAVIORS} or the flight labels {_flight_labels()}; "
+                    "pass the body's behavior label.")
+        elif obs_flight and exp != "escape":
+            verdict, comparable = "inconclusive", False
+            note = f"flight label {obs!r} can only be compared with 'escape' (takeoff) ground truth, not {exp!r}."
         elif exp not in BODY_BEHAVIORS and obs in BODY_BEHAVIORS:
             # The NeuroMechFly walking body cannot express escape / groom / feed (same rule as atlas.evaluate).
             verdict, comparable = "inconclusive", False
@@ -1106,10 +1136,10 @@ def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experi
                     "descending_group_rates_hz / other_group_rates_hz) against a control run instead.")
         elif effect == "reduce":
             # Published result: the manipulation REDUCES/abolishes `exp`.
-            if obs == exp:
+            if obs_c == exp:
                 verdict = "inconsistent"
                 note = f"{exp} still present despite the manipulation that should reduce it."
-            elif ctrl and ctrl != exp:
+            elif ctrl and ctrl_c != exp:
                 verdict = "inconclusive"
                 note = f"control run did not show {exp} either ({ctrl}); the comparison cannot test the reduction."
             elif ctrl:
@@ -1119,7 +1149,7 @@ def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experi
                 verdict = "partially_consistent"
                 note = f"{exp} absent, but no control run was given - weak evidence."
         else:
-            if obs == exp:
+            if obs_c == exp:
                 verdict = "consistent"
             elif obs in TURNS and exp in TURNS:
                 # Wrong laterality contradicts the published result (same rule as atlas.evaluate).
@@ -1131,7 +1161,12 @@ def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experi
             else:
                 verdict = "inconsistent"
                 note = f"expected {exp}, observed {obs}."
-        if comparable and exp not in BODY_BEHAVIORS:
+        if comparable and obs_flight:
+            note = (note + " " if note else "") + (
+                f"NOTE: flight label '{obs}' counts as '{obs_c}' (takeoff = any flight label except no_takeoff). "
+                "In the adapter the takeoff trigger is wired to GF (G4): GF-linked agreement checks the adapter + body, "
+                "not independent evidence; GF-silenced -> no_takeoff is a design consequence.")
+        elif comparable and exp not in BODY_BEHAVIORS:
             note = (note + " " if note else "") + (f"NOTE: '{exp}' is not a body-model behavior; the observed label "
                                                     "is an agent interpretation of brain readouts.")
         # Check the referenced experiment(s) against the published manipulation and the label provenance
@@ -1151,7 +1186,7 @@ def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experi
                 note = (note + " " if note else "") + f"{n}: body movement NOT verified (no verify_movement call)."
                 continue
             for v in vl:
-                if v.get("expected") != obs:
+                if v.get("expected") not in (obs, obs_c):
                     continue
                 movement_verified = v.get("final_verdict") == "correct"
                 if v.get("final_verdict") == "incorrect" and verdict == "consistent":
@@ -1206,12 +1241,30 @@ def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experi
 # =========================================================================== movement verification (Phase 3)
 
 
+def _resolve_gt(ground_truth_id: str, gt: dict) -> str | None:
+    """Exact ground-truth id, else a UNIQUE prefix such as "gt08" -> "gt08_lplc2_activate_escape" (agents abbreviate)."""
+    gid = str(ground_truth_id or "").strip()
+    if gid in gt:
+        return gid
+    hits = [k for k in gt if k.lower().startswith(gid.lower() + "_") or k.lower() == gid.lower()]
+    return hits[0] if len(hits) == 1 else None
+
+
 def _expected_from(ground_truth_id: str, hypothesis_id: str, rid: str) -> tuple[str, str]:
     if ground_truth_id:
-        e = {str(x.get("id")): x for x in _ground_truth()}.get(str(ground_truth_id))
+        gtm = {str(x.get("id")): x for x in _ground_truth()}
+        gid = _resolve_gt(ground_truth_id, gtm)
+        e = gtm.get(gid) if gid else None
         if e is None:
             raise ValueError(f"unknown ground_truth_id {ground_truth_id!r}")
-        return str(e.get("expected_behavior") or ""), f"ground truth {ground_truth_id}"
+        exp = str(e.get("expected_behavior") or "")
+        if str(e.get("effect") or "").lower() == "reduce":
+            # silencing entry: the MANIPULATED run should NOT show the behaviour
+            if exp == "escape":
+                return "no_takeoff", f"ground truth {gid} (silencing: takeoff expected to be absent)"
+            raise ValueError(f"{gid} is a silencing entry (effect reduce): the body should NOT show {exp!r}; "
+                             "pass expected_behavior explicitly (e.g. the control's label vs the manipulated run's)")
+        return exp, f"ground truth {gid}"
     if hypothesis_id:
         for ev in record.load(rid):
             d = ev.get("data") or {}

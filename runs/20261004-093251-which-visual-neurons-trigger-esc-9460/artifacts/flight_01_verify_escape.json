@@ -1,0 +1,81 @@
+{
+ "expected_behavior": "escape",
+ "mode": "flight",
+ "kinematic": {
+  "verdict": "correct",
+  "checks": [
+   {
+    "name": "airborne_time_s",
+    "value": 0.95,
+    "threshold": ">= 0.05 s with height gain > 1.0 mm",
+    "pass": true
+   },
+   {
+    "name": "final_abs_roll_deg",
+    "value": 0.2,
+    "threshold": "<= 90.0",
+    "pass": true
+   }
+  ],
+  "recomputed": {
+   "duration_s": 1.0,
+   "n_samples": 101,
+   "start_height_mm": 0.0,
+   "max_height_gain_mm": 18.209,
+   "final_height_gain_mm": 17.694,
+   "airborne_time_s": 0.95,
+   "first_airborne_t_s": 0.06,
+   "forward_disp_initial_frame_mm": 19.737,
+   "lateral_disp_initial_frame_mm": 3.498,
+   "dz_mm": 17.694,
+   "horizontal_disp_mm": 20.044,
+   "heading_change_deg": -0.44,
+   "final_abs_roll_deg": 0.2,
+   "max_abs_roll_deg": 0.7
+  },
+  "reason": "all checks passed"
+ },
+ "vision": {
+  "verdict": "uncertain",
+  "observed_behavior": "climb",
+  "matches_expected": null,
+  "confidence": 0.6,
+  "observations": [
+   "Tile 1-2: fly near floor, camera looking down at it close to ground.",
+   "Tiles 3-4: floor drops lower in frame, horizon tilts; fly above floor with wings beating.",
+   "Tiles 5-16: fly stays centered with floor progressively lower in frame and receding, suggesting gain in altitude.",
+   "Wings visibly beating throughout tiles 3-16; no landing contact seen.",
+   "Little obvious forward displacement or consistent yaw change in floor texture after tile 5."
+  ],
+  "fly_visible": true,
+  "model": "claude-opus-5-5",
+  "frames_used": 16,
+  "cached": false,
+  "usage": {
+   "input_tokens": 2492,
+   "output_tokens": 202
+  },
+  "video_sha256": "bad608576df802a69ac9a21d6115c350bda66d8d28b3c3ae24c42a02761f73ca",
+  "blind": "model saw neither the expected behaviour nor the kinematic numbers"
+ },
+ "vision_error": null,
+ "final_verdict": "uncertain",
+ "agreement": false,
+ "methods": [
+  "kinematic",
+  "vision"
+ ],
+ "reason": "kinematic=correct (all checks passed), vision=uncertain (observed climb, conf 0.6)",
+ "contact_sheet": "runs/20261004-093251-which-visual-neurons-trigger-esc-9460/artifacts/flight_01_contact.jpg",
+ "video": "runs/20261004-093251-which-visual-neurons-trigger-esc-9460/artifacts/flight_01.mp4",
+ "independence_note": "kinematics recomputed from the raw trajectory with own formulas/thresholds (not body.classify / flight.classify_flight); vision is blind to both",
+ "artifact": "flight_01.json",
+ "expected_source": "hypothesis H1 (agent-generated)",
+ "mock": false,
+ "manipulation": {
+  "excite": [
+   "LPLC2"
+  ],
+  "silence": []
+ }
+}

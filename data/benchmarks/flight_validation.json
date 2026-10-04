@@ -1,0 +1,3922 @@
+{
+ "what": "Embodied flight validation: FlyWire v783 LIF brain -> flylab.bridge (frozen flight adapter) -> FlyBody physics (flylab.flight)",
+ "created": "2026-10-04 09:09:38",
+ "protocol": {
+  "brain_duration_ms": 1000.0,
+  "n_trials": 3,
+  "body_duration_s": 1.0,
+  "seed": 0,
+  "bridge_ref_rate_hz": 148.3,
+  "takeoff_threshold": 0.5,
+  "amplitude_gain_min": 1.05,
+  "vision_conditions": [
+   "LPLC2_bilateral",
+   "LPLC2_GF_silenced"
+  ],
+  "adapter_version": "flight-adapter-v1",
+  "adapter_parameter_hash": "02ef23b1b5d6dca2"
+ },
+ "adapter": {
+  "name": "flylab.bridge flight adapter (hand-designed, frozen)",
+  "frozen": {
+   "version": "flight-adapter-v1",
+   "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+   "parameter_hash": "02ef23b1b5d6dca2",
+   "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+  },
+  "params": {
+   "takeoff_group": "GF",
+   "takeoff_rule": "mean(a(GF_L), a(GF_R))",
+   "takeoff_threshold": 0.5,
+   "thrust_group": "DNg02",
+   "thrust_rule": "baseline + (1-baseline)*a(n-weighted mean rate of DNg02_L, DNg02_R)",
+   "thrust_baseline": 0.0,
+   "yaw_terms": [
+    [
+     "DNa02",
+     1.0
+    ],
+    [
+     "DNa01",
+     0.5
+    ]
+   ],
+   "pitch": 0.0,
+   "ref_rate_hz": 148.3
+  },
+  "terms": [
+   {
+    "output": "takeoff",
+    "groups": [
+     "GF_L",
+     "GF_R"
+    ],
+    "formula": "takeoff = mean(a(GF_L), a(GF_R)); escape sequence if >= 0.5",
+    "citations": [
+     "10.1016/j.cell.2005.02.004",
+     "10.1038/nn.3741"
+    ],
+    "description": "Giant fiber (DNp01): GF activation elicits escape takeoff / wing beating / flight (Lima & Miesenboeck 2005); GF spike timing selects short vs. long takeoff (von Reyn et al. 2014). Threshold = half the measured reference rate (hand-chosen)."
+   },
+   {
+    "output": "thrust",
+    "groups": [
+     "DNg02_L",
+     "DNg02_R"
+    ],
+    "formula": "thrust = a(n-weighted mean DNg02 rate)",
+    "citations": [
+     "10.1016/j.cub.2022.01.008"
+    ],
+    "description": "DNg02 population code for wingbeat amplitude (Namiki et al. 2022). 25 DNg02 neurons in FlyWire v783 vs 'at least 15 pairs' in the paper (identification by cell-type name, medium confidence). thrust 0 = hand-designed hover trim (constant baseline flight-motor drive once airborne)."
+   },
+   {
+    "output": "yaw",
+    "groups": [
+     "DNa02_L",
+     "DNa02_R",
+     "DNa01_L",
+     "DNa01_R"
+    ],
+    "formula": "yaw = clip(1.0*(a(DNa02_R)-a(DNa02_L)) + 0.5*(a(DNa01_R)-a(DNa01_L)), -1, 1)",
+    "citations": [
+     "10.7554/elife.102230"
+    ],
+    "description": "Walking-steering DNs reused for flight yaw: a TRANSFER ASSUMPTION, not literature-verified for flight."
+   },
+   {
+    "output": "pitch",
+    "groups": [],
+    "formula": "pitch = 0",
+    "citations": [],
+    "description": "No connectome input: no forward-flight drive."
+   }
+  ],
+  "mode_rule": "flight if takeoff >= threshold (rates_to_behavior_command), else the walking drive",
+  "scope": "FlyWire covers the brain only; the VNC, flight muscles, halteres and wing hinge are replaced by this adapter and by flylab.flight (quasi-steady aerodynamics + attitude stabiliser).",
+  "limitations": [
+   "G4: a body controller that can fly is not evidence of connectome-controlled flight. The connectome decides only the takeoff trigger (GF), the wingbeat-amplitude increment (DNg02) and a steering asymmetry; everything else is hand-designed.",
+   "GF is the only takeoff trigger. In real flies parallel (non-GF) circuits also produce takeoffs (long takeoff that initiates stable flight, von Reyn et al. 2014), so 'GF silenced -> no takeoff' is a consequence of this design, not a finding.",
+   "The model has a single takeoff label; the short (GF-driven, flight-unstable) vs. long takeoff modes are not distinguished.",
+   "Post-takeoff flight stability comes from the hand-designed attitude stabiliser, not from the connectome.",
+   "Open loop: constant command from time-averaged 1-s brain rates; no visual or haltere feedback to the brain.",
+   "Yaw reuses walking-steering DNs (assumption); flight turning is not validated against literature.",
+   "A single GF at full rate gives takeoff = 0.5 = the threshold (borderline by construction); unilateral GF activation is not validated."
+  ]
+ },
+ "body_model_notes": {
+  "body": "FlyBody (Vaxenburg et al. 2025, Nature, doi:10.1038/s41586-025-09029-4), original fruitfly.xml from flygym 2.1 with full-size meshes; MuJoCo rigid-body physics, ground contact, gravity.",
+  "approach": "B: wingbeat-cycle-averaged quasi-steady aerodynamics applied as forces/torques (mj_applyFT); MuJoCo fluid model off. Approach A (MuJoCo fluid forces on flapping wings) not completed in the time box.",
+  "physics": [
+   "rigid-body dynamics of the whole fly (MuJoCo, dt 0.1 ms)",
+   "gravity and ground contact",
+   "quasi-steady mean lift L = 0.5 rho C_L S <U2^2> per wing at a centre of pressure (roll/pitch torques emerge from left/right lift difference and fore/aft centre-of-pressure shift)",
+   "flapping counter-force damping (translational and rotational)",
+   "jump impulse integration",
+   "wing joint servo dynamics (wings flap at 200 Hz; visual realism, no fluid force from them)"
+  ],
+  "aero_parameters": {
+   "rho_g_cm3": 0.00128,
+   "wing_area_mm2": 1.973,
+   "wing_length_mm": 2.28,
+   "r2_mm": 1.275,
+   "freq_hz": 200.0,
+   "alpha_deg": 45.0,
+   "C_L": 1.805,
+   "C_D": 1.704,
+   "C_L_C_D_source": "Dickinson, Lehmann & Sane 1999, Science, doi:10.1126/science.284.5422.1954",
+   "phi_hover_deg": null,
+   "mass_mg": null
+  },
+  "hand_designed": [
+   "trim: baseline amplitude solved for lift = weight",
+   "thrust -> amplitude: Phi = Phi_hover * (1 + 0.12 * thrust), max 170 deg",
+   "attitude stabiliser (PD, 10.0 Hz) acting through amplitude asymmetry (roll), mean stroke angle (pitch), drag asymmetry (yaw); stands in for halteres + steering muscles (not connectome)",
+   "pitch -> stroke-plane tilt up to 25 deg; yaw -> target yaw rate up to 400 deg/s",
+   "takeoff >= 0.5 -> escape sequence: jump impulse 6.1 g for 6 ms (elevation 70 deg) + T2 leg extension, wings start after 4 ms (all values hand-chosen)",
+   "wing joint kinematics (sinusoidal stroke + rotation flips) are for visualisation"
+  ],
+  "connectome_decides": "only the command (takeoff trigger, thrust, yaw, pitch) via flylab.bridge.rates_to_flight_command; a body that can fly is not evidence of connectome-controlled flight (G4).",
+  "not_modelled": [
+   "unsteady aerodynamics (rotational lift, wake capture, added mass)",
+   "haltere sensing",
+   "sensory feedback to the brain (open loop)",
+   "leg retraction in flight",
+   "landing"
+  ]
+ },
+ "caveats": [
+  "G4: a body controller that can fly is not evidence of connectome-controlled flight. The connectome model decides the GF takeoff trigger, the DNg02 wingbeat-amplitude increment and a steering asymmetry; the jump impulse, wing kinematics, attitude stabiliser and quasi-steady aerodynamics are hand-designed (flylab.flight).",
+  "G5: open loop, constant command from 1-s time-averaged brain rates (3 trials); no sensory feedback; the upstream stimulus is a Poisson activation of LPLC2 (looming-detector) neurons, not a rendered looming stimulus.",
+  "GF -> takeoff and DNg02 -> amplitude are adapter design terms taken from the same papers used as ground truth: those rows are plumbing checks (circular). The partly emergent part is LPLC2 -> GF firing (and its dose dependence) from the connectome model.",
+  "GF-silenced and DNg02-only rows are consequences of the adapter design (GF is the only takeoff trigger), not findings; real flies also take off via parallel non-GF circuits (von Reyn et al. 2014).",
+  "Single brain seed per condition; body label stability checked with 3 further physics seeds (body_seed_robustness).",
+  "Takeoff here is one label; the short (GF) vs long takeoff modes are not distinguished, and post-takeoff stability comes from a hand-designed attitude controller. Flight yaw (walking-steering DN transfer) is not validated.",
+  "Video and poses are stroboscopic (wing beat appears slowed, 30 fps video of 200 Hz wingbeat); wing forces are cycle-averaged."
+ ],
+ "rows": [
+  {
+   "condition": "control",
+   "stimulus": "none (brain silent, nothing simulated)",
+   "stimulus_groups": [],
+   "excite_rate_hz": 0.0,
+   "silenced_groups": [],
+   "brain": {
+    "n_active_neurons": 0,
+    "runtime_s": 0.0,
+    "n_trials": 3,
+    "duration_ms": 1000.0,
+    "key_group_rates_hz": {
+     "GF_L": 0.0,
+     "GF_R": 0.0,
+     "DNg02_L": 0.0,
+     "DNg02_R": 0.0,
+     "DNa01_L": 0.0,
+     "DNa01_R": 0.0,
+     "DNa02_L": 0.0,
+     "DNa02_R": 0.0
+    }
+   },
+   "adapter": {
+    "mode": "walk",
+    "command": {
+     "takeoff": 0.0,
+     "thrust": 0.0,
+     "yaw": 0.0,
+     "pitch": 0.0
+    },
+    "walk_drive_if_not_flying": {
+     "forward": 0.0,
+     "turn": 0.0,
+     "backward": 0.0
+    },
+    "mode_rule": "mode = flight if takeoff = mean(a(GF_L), a(GF_R)) >= 0.5 (= 74 Hz mean GF rate), else walk",
+    "terms": {
+     "takeoff": "mean(a(GF_L)=0.000, a(GF_R)=0.000) = 0.000",
+     "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+     "yaw_components (w*(a_R-a_L))": {
+      "DNa02": 0.0,
+      "DNa01": 0.0
+     },
+     "yaw_raw": 0.0,
+     "pitch": "0.0 (no connectome input)"
+    },
+    "takeoff_activation": 0.0,
+    "explain": {
+     "input_mode": "empty",
+     "group_rates_hz": {
+      "GF_L": 0.0,
+      "GF_R": 0.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "activation": {
+      "GF_L": 0.0,
+      "GF_R": 0.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=0.000, a(GF_R)=0.000) = 0.000",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": 0.0,
+       "DNa01": 0.0
+      },
+      "yaw_raw": 0.0,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": false,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    },
+    "frozen_hash": "02ef23b1b5d6dca2"
+   },
+   "body": {
+    "behavior": "no_takeoff",
+    "airborne": false,
+    "takeoff_time_s": null,
+    "flight_time_s": 0.0,
+    "max_height_mm": -0.0,
+    "final_height_mm": -0.001,
+    "net_displacement_mm": [
+     -0.0,
+     0.001,
+     -0.001
+    ],
+    "heading_change_deg": 0.02,
+    "mean_speed_mm_s": 0.002,
+    "wing_amplitude_deg": 0.0,
+    "metrics_flight_phase": {
+     "window_s": null
+    },
+    "warnings": null,
+    "runtime_s": 7.38,
+    "wall_per_sim_s": 6.69,
+    "trajectory_downsampled": [
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.03,
+      2.38,
+      -0.36
+     ],
+     [
+      0.05,
+      -0.0,
+      -0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.1,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.16,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.22,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.27,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.32,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.37,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.42,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.47,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.52,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.58,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.63,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.68,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.74,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.79,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.85,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.9,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.96,
+      -0.0,
+      0.001,
+      -0.001,
+      0.03,
+      2.4,
+      -0.34
+     ]
+    ]
+   },
+   "expected": "no_takeoff",
+   "expected_source": "design control (no stimulus; the model has 0 Hz baseline)",
+   "as_expected": true,
+   "result_type": "control",
+   "result_type_text": "control",
+   "checks": [],
+   "gt_id": null,
+   "verification": {
+    "expected_for_verifier": "no_takeoff",
+    "final_verdict": "correct",
+    "kinematic": {
+     "verdict": "correct",
+     "checks": [
+      {
+       "name": "airborne_time_s",
+       "value": 0.0,
+       "threshold": ">= 0.05 s with height gain > 1.0 mm",
+       "pass": false
+      },
+      {
+       "name": "final_abs_roll_deg",
+       "value": 0.0,
+       "threshold": "<= 90.0",
+       "pass": true
+      }
+     ],
+     "recomputed": {
+      "duration_s": 1.0,
+      "n_samples": 101,
+      "start_height_mm": 0.0,
+      "max_height_gain_mm": 0.0,
+      "final_height_gain_mm": -0.001,
+      "airborne_time_s": 0.0,
+      "first_airborne_t_s": null,
+      "forward_disp_initial_frame_mm": -0.0,
+      "lateral_disp_initial_frame_mm": 0.001,
+      "dz_mm": -0.001,
+      "horizontal_disp_mm": 0.001,
+      "heading_change_deg": 0.02,
+      "final_abs_roll_deg": 0.0,
+      "max_abs_roll_deg": 0.0
+     },
+     "reason": "all checks passed"
+    },
+    "vision": null,
+    "vision_error": null,
+    "agreement": null,
+    "methods": [
+     "kinematic"
+    ],
+    "reason": "kinematic only (vision disabled): all checks passed",
+    "contact_sheet": null
+   },
+   "video": "assets/flight/control.mp4",
+   "poses": "spikes/flight/out/poses_control.json",
+   "runtimes_s": {
+    "brain": 0.0,
+    "body": 7.38,
+    "total": 7.56
+   },
+   "behavior": "no_takeoff",
+   "airborne": false,
+   "max_height_mm": -0.0,
+   "command": {
+    "takeoff": 0.0,
+    "thrust": 0.0,
+    "yaw": 0.0,
+    "pitch": 0.0,
+    "explain": {
+     "input_mode": "empty",
+     "group_rates_hz": {
+      "GF_L": 0.0,
+      "GF_R": 0.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "activation": {
+      "GF_L": 0.0,
+      "GF_R": 0.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=0.000, a(GF_R)=0.000) = 0.000",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": 0.0,
+       "DNa01": 0.0
+      },
+      "yaw_raw": 0.0,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": false,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    }
+   },
+   "key_group_rates_hz": {
+    "GF_L": 0.0,
+    "GF_R": 0.0,
+    "DNg02_L": 0.0,
+    "DNg02_R": 0.0,
+    "DNa01_L": 0.0,
+    "DNa01_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0
+   },
+   "stimulus_type": "no stimulus (control)",
+   "body_seed_robustness": {
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "no_takeoff",
+     "no_takeoff",
+     "no_takeoff"
+    ],
+    "fraction_same_as_main": 1.0
+   },
+   "verdict": "no_ground_truth"
+  },
+  {
+   "condition": "GF_bilateral",
+   "stimulus": "direct 150 Hz Poisson activation of both giant fibers (DNp01), optogenetic-style",
+   "stimulus_groups": [
+    "GF"
+   ],
+   "excite_rate_hz": 150.0,
+   "silenced_groups": [],
+   "brain": {
+    "n_active_neurons": 29,
+    "runtime_s": 8.694,
+    "n_trials": 3,
+    "duration_ms": 1000.0,
+    "key_group_rates_hz": {
+     "GF_L": 159.667,
+     "GF_R": 179.0,
+     "DNg02_L": 0.0,
+     "DNg02_R": 0.0,
+     "DNa01_L": 0.0,
+     "DNa01_R": 0.0,
+     "DNa02_L": 0.0,
+     "DNa02_R": 0.0
+    }
+   },
+   "adapter": {
+    "mode": "flight",
+    "command": {
+     "takeoff": 1.0,
+     "thrust": 0.0,
+     "yaw": 0.0,
+     "pitch": 0.0
+    },
+    "walk_drive_if_not_flying": null,
+    "mode_rule": "mode = flight if takeoff = mean(a(GF_L), a(GF_R)) >= 0.5 (= 74 Hz mean GF rate), else walk",
+    "terms": {
+     "takeoff": "mean(a(GF_L)=1.000, a(GF_R)=1.000) = 1.000",
+     "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+     "yaw_components (w*(a_R-a_L))": {
+      "DNa02": 0.0,
+      "DNa01": 0.0
+     },
+     "yaw_raw": 0.0,
+     "pitch": "0.0 (no connectome input)"
+    },
+    "takeoff_activation": 1.0,
+    "explain": {
+     "input_mode": "neuron_rates",
+     "group_rates_hz": {
+      "GF_L": 159.667,
+      "GF_R": 179.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "activation": {
+      "GF_L": 1.0,
+      "GF_R": 1.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=1.000, a(GF_R)=1.000) = 1.000",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": 0.0,
+       "DNa01": 0.0
+      },
+      "yaw_raw": 0.0,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": true,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    },
+    "frozen_hash": "02ef23b1b5d6dca2"
+   },
+   "body": {
+    "behavior": "hover",
+    "airborne": true,
+    "takeoff_time_s": 0.06,
+    "flight_time_s": 0.95,
+    "max_height_mm": 18.187,
+    "final_height_mm": 17.673,
+    "net_displacement_mm": [
+     19.834,
+     3.302,
+     17.673
+    ],
+    "heading_change_deg": -1.14,
+    "mean_speed_mm_s": 32.37,
+    "wing_amplitude_deg": 146.69,
+    "metrics_flight_phase": {
+     "window_s": [
+      0.36,
+      1.0
+     ],
+     "climb_rate_mm_s": -0.411,
+     "forward_speed_mm_s": -2.829,
+     "horizontal_speed_mm_s": 4.549,
+     "yaw_rate_deg_s": 0.828,
+     "heading_change_deg": 0.53
+    },
+    "warnings": null,
+    "runtime_s": 18.06,
+    "wall_per_sim_s": 16.9,
+    "trajectory_downsampled": [
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.03,
+      2.38,
+      -0.36
+     ],
+     [
+      0.05,
+      -0.0,
+      -0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.1,
+      7.54,
+      -0.045,
+      8.412,
+      0.28,
+      36.38,
+      -0.02
+     ],
+     [
+      0.16,
+      16.9,
+      0.015,
+      13.451,
+      0.65,
+      49.91,
+      -0.74
+     ],
+     [
+      0.22,
+      20.805,
+      0.249,
+      15.998,
+      0.55,
+      49.73,
+      -1.57
+     ],
+     [
+      0.27,
+      21.669,
+      0.508,
+      17.089,
+      0.58,
+      48.55,
+      -1.88
+     ],
+     [
+      0.32,
+      21.74,
+      0.788,
+      17.677,
+      0.59,
+      47.85,
+      -1.99
+     ],
+     [
+      0.37,
+      21.596,
+      1.066,
+      17.981,
+      0.49,
+      47.58,
+      -1.97
+     ],
+     [
+      0.42,
+      21.426,
+      1.328,
+      18.126,
+      0.42,
+      47.52,
+      -1.88
+     ],
+     [
+      0.47,
+      21.261,
+      1.566,
+      18.18,
+      0.37,
+      47.52,
+      -1.78
+     ],
+     [
+      0.52,
+      21.103,
+      1.784,
+      18.184,
+      0.38,
+      47.52,
+      -1.7
+     ],
+     [
+      0.58,
+      20.919,
+      2.026,
+      18.152,
+      0.34,
+      47.51,
+      -1.62
+     ],
+     [
+      0.63,
+      20.77,
+      2.211,
+      18.108,
+      0.31,
+      47.5,
+      -1.66
+     ],
+     [
+      0.68,
+      20.626,
+      2.385,
+      18.057,
+      0.31,
+      47.49,
+      -1.59
+     ],
+     [
+      0.74,
+      20.463,
+      2.582,
+      17.989,
+      0.29,
+      47.48,
+      -1.55
+     ],
+     [
+      0.79,
+      20.335,
+      2.736,
+      17.93,
+      0.24,
+      47.47,
+      -1.55
+     ],
+     [
+      0.85,
+      20.187,
+      2.911,
+      17.858,
+      0.27,
+      47.47,
+      -1.55
+     ],
+     [
+      0.9,
+      20.065,
+      3.048,
+      17.796,
+      0.23,
+      47.47,
+      -1.5
+     ],
+     [
+      0.96,
+      19.924,
+      3.203,
+      17.722,
+      0.22,
+      47.46,
+      -1.49
+     ]
+    ]
+   },
+   "expected": "takeoff",
+   "expected_source": "literature: Lima & Miesenboeck 2005 (gt07), von Reyn et al. 2014 (gt24)",
+   "as_expected": true,
+   "result_type": "circular",
+   "result_type_text": "circular: the adapter maps this neuron population to the command using the same papers that define the ground truth (plumbing / sign check, not a discovery)",
+   "checks": [
+    {
+     "gt_id": "gt07_gf_activate_escape",
+     "comparison": "flight body behaviour",
+     "observed": "hover",
+     "expected_behavior": "escape",
+     "effect": "induce",
+     "verdict": "consistent",
+     "reason": "observed behaviour matches"
+    },
+    {
+     "gt_id": "gt24_gf_activate_takeoff_vonreyn",
+     "comparison": "flight body behaviour",
+     "observed": "hover",
+     "expected_behavior": "escape",
+     "effect": "induce",
+     "verdict": "consistent",
+     "reason": "observed behaviour matches"
+    }
+   ],
+   "gt_id": "gt07_gf_activate_escape",
+   "verification": {
+    "expected_for_verifier": "escape",
+    "final_verdict": "correct",
+    "kinematic": {
+     "verdict": "correct",
+     "checks": [
+      {
+       "name": "airborne_time_s",
+       "value": 0.95,
+       "threshold": ">= 0.05 s with height gain > 1.0 mm",
+       "pass": true
+      },
+      {
+       "name": "final_abs_roll_deg",
+       "value": 0.2,
+       "threshold": "<= 90.0",
+       "pass": true
+      }
+     ],
+     "recomputed": {
+      "duration_s": 1.0,
+      "n_samples": 101,
+      "start_height_mm": 0.0,
+      "max_height_gain_mm": 18.187,
+      "final_height_gain_mm": 17.673,
+      "airborne_time_s": 0.95,
+      "first_airborne_t_s": 0.06,
+      "forward_disp_initial_frame_mm": 19.813,
+      "lateral_disp_initial_frame_mm": 3.427,
+      "dz_mm": 17.673,
+      "horizontal_disp_mm": 20.107,
+      "heading_change_deg": -1.14,
+      "final_abs_roll_deg": 0.2,
+      "max_abs_roll_deg": 0.7
+     },
+     "reason": "all checks passed"
+    },
+    "vision": null,
+    "vision_error": null,
+    "agreement": null,
+    "methods": [
+     "kinematic"
+    ],
+    "reason": "kinematic only (vision disabled): all checks passed",
+    "contact_sheet": null
+   },
+   "video": "assets/flight/GF_bilateral.mp4",
+   "poses": "spikes/flight/out/poses_GF_bilateral.json",
+   "runtimes_s": {
+    "brain": 8.694,
+    "body": 18.06,
+    "total": 26.83
+   },
+   "behavior": "hover",
+   "airborne": true,
+   "max_height_mm": 18.187,
+   "command": {
+    "takeoff": 1.0,
+    "thrust": 0.0,
+    "yaw": 0.0,
+    "pitch": 0.0,
+    "explain": {
+     "input_mode": "neuron_rates",
+     "group_rates_hz": {
+      "GF_L": 159.667,
+      "GF_R": 179.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "activation": {
+      "GF_L": 1.0,
+      "GF_R": 1.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=1.000, a(GF_R)=1.000) = 1.000",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": 0.0,
+       "DNa01": 0.0
+      },
+      "yaw_raw": 0.0,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": true,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    }
+   },
+   "key_group_rates_hz": {
+    "GF_L": 159.667,
+    "GF_R": 179.0,
+    "DNg02_L": 0.0,
+    "DNg02_R": 0.0,
+    "DNa01_L": 0.0,
+    "DNa01_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0
+   },
+   "stimulus_type": "direct DN (partly circular)",
+   "body_seed_robustness": {
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "hover",
+     "hover",
+     "hover"
+    ],
+    "fraction_same_as_main": 1.0
+   },
+   "verdict": "consistent"
+  },
+  {
+   "condition": "LPLC2_10Hz",
+   "stimulus": "weak 10 Hz Poisson drive of all LPLC2 neurons (sub-threshold looming stand-in)",
+   "stimulus_groups": [
+    "LPLC2"
+   ],
+   "excite_rate_hz": 10.0,
+   "silenced_groups": [],
+   "brain": {
+    "n_active_neurons": 398,
+    "runtime_s": 11.903,
+    "n_trials": 3,
+    "duration_ms": 1000.0,
+    "key_group_rates_hz": {
+     "GF_L": 22.333,
+     "GF_R": 50.0,
+     "DNg02_L": 0.0,
+     "DNg02_R": 0.0,
+     "DNa01_L": 0.0,
+     "DNa01_R": 0.0,
+     "DNa02_L": 0.0,
+     "DNa02_R": 0.0
+    }
+   },
+   "adapter": {
+    "mode": "walk",
+    "command": {
+     "takeoff": 0.2439,
+     "thrust": 0.0,
+     "yaw": 0.0,
+     "pitch": 0.0
+    },
+    "walk_drive_if_not_flying": {
+     "forward": 0.0,
+     "turn": 0.0,
+     "backward": 0.0
+    },
+    "mode_rule": "mode = flight if takeoff = mean(a(GF_L), a(GF_R)) >= 0.5 (= 74 Hz mean GF rate), else walk",
+    "terms": {
+     "takeoff": "mean(a(GF_L)=0.151, a(GF_R)=0.337) = 0.244",
+     "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+     "yaw_components (w*(a_R-a_L))": {
+      "DNa02": 0.0,
+      "DNa01": 0.0
+     },
+     "yaw_raw": 0.0,
+     "pitch": "0.0 (no connectome input)"
+    },
+    "takeoff_activation": 0.2439,
+    "explain": {
+     "input_mode": "neuron_rates",
+     "group_rates_hz": {
+      "GF_L": 22.333,
+      "GF_R": 50.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "activation": {
+      "GF_L": 0.1506,
+      "GF_R": 0.3372,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=0.151, a(GF_R)=0.337) = 0.244",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": 0.0,
+       "DNa01": 0.0
+      },
+      "yaw_raw": 0.0,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": false,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    },
+    "frozen_hash": "02ef23b1b5d6dca2"
+   },
+   "body": {
+    "behavior": "no_takeoff",
+    "airborne": false,
+    "takeoff_time_s": null,
+    "flight_time_s": 0.0,
+    "max_height_mm": -0.0,
+    "final_height_mm": -0.001,
+    "net_displacement_mm": [
+     -0.0,
+     0.001,
+     -0.001
+    ],
+    "heading_change_deg": 0.02,
+    "mean_speed_mm_s": 0.002,
+    "wing_amplitude_deg": 0.0,
+    "metrics_flight_phase": {
+     "window_s": null
+    },
+    "warnings": null,
+    "runtime_s": 16.82,
+    "wall_per_sim_s": 15.77,
+    "trajectory_downsampled": [
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.03,
+      2.38,
+      -0.36
+     ],
+     [
+      0.05,
+      -0.0,
+      -0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.1,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.16,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.22,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.27,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.32,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.37,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.42,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.47,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.52,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.58,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.63,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.68,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.74,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.79,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.85,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.9,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.96,
+      -0.0,
+      0.001,
+      -0.001,
+      0.03,
+      2.4,
+      -0.34
+     ]
+    ]
+   },
+   "expected": "no_takeoff",
+   "expected_source": "model prediction from the LPLC2 dose-response probe (GF activation below the 0.5 threshold); no literature ground truth",
+   "as_expected": true,
+   "result_type": "emergent_upstream",
+   "result_type_text": "partly emergent: the GF rate arises from the connectome model (LPLC2 -> GF); the GF -> takeoff step is the adapter (circular)",
+   "checks": [],
+   "gt_id": null,
+   "verification": {
+    "expected_for_verifier": "no_takeoff",
+    "final_verdict": "correct",
+    "kinematic": {
+     "verdict": "correct",
+     "checks": [
+      {
+       "name": "airborne_time_s",
+       "value": 0.0,
+       "threshold": ">= 0.05 s with height gain > 1.0 mm",
+       "pass": false
+      },
+      {
+       "name": "final_abs_roll_deg",
+       "value": 0.0,
+       "threshold": "<= 90.0",
+       "pass": true
+      }
+     ],
+     "recomputed": {
+      "duration_s": 1.0,
+      "n_samples": 101,
+      "start_height_mm": 0.0,
+      "max_height_gain_mm": 0.0,
+      "final_height_gain_mm": -0.001,
+      "airborne_time_s": 0.0,
+      "first_airborne_t_s": null,
+      "forward_disp_initial_frame_mm": -0.0,
+      "lateral_disp_initial_frame_mm": 0.001,
+      "dz_mm": -0.001,
+      "horizontal_disp_mm": 0.001,
+      "heading_change_deg": 0.02,
+      "final_abs_roll_deg": 0.0,
+      "max_abs_roll_deg": 0.0
+     },
+     "reason": "all checks passed"
+    },
+    "vision": null,
+    "vision_error": null,
+    "agreement": null,
+    "methods": [
+     "kinematic"
+    ],
+    "reason": "kinematic only (vision disabled): all checks passed",
+    "contact_sheet": null
+   },
+   "video": "assets/flight/LPLC2_10Hz.mp4",
+   "poses": "spikes/flight/out/poses_LPLC2_10Hz.json",
+   "runtimes_s": {
+    "brain": 11.903,
+    "body": 16.82,
+    "total": 28.79
+   },
+   "behavior": "no_takeoff",
+   "airborne": false,
+   "max_height_mm": -0.0,
+   "command": {
+    "takeoff": 0.2439,
+    "thrust": 0.0,
+    "yaw": 0.0,
+    "pitch": 0.0,
+    "explain": {
+     "input_mode": "neuron_rates",
+     "group_rates_hz": {
+      "GF_L": 22.333,
+      "GF_R": 50.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "activation": {
+      "GF_L": 0.1506,
+      "GF_R": 0.3372,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=0.151, a(GF_R)=0.337) = 0.244",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": 0.0,
+       "DNa01": 0.0
+      },
+      "yaw_raw": 0.0,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": false,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    }
+   },
+   "key_group_rates_hz": {
+    "GF_L": 22.333,
+    "GF_R": 50.0,
+    "DNg02_L": 0.0,
+    "DNg02_R": 0.0,
+    "DNa01_L": 0.0,
+    "DNa01_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0
+   },
+   "stimulus_type": "upstream (emergent via connectome)",
+   "body_seed_robustness": {
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "no_takeoff",
+     "no_takeoff",
+     "no_takeoff"
+    ],
+    "fraction_same_as_main": 1.0
+   },
+   "verdict": "no_ground_truth"
+  },
+  {
+   "condition": "LPLC2_30Hz",
+   "stimulus": "moderate 30 Hz Poisson drive of all LPLC2 neurons (looming stand-in)",
+   "stimulus_groups": [
+    "LPLC2"
+   ],
+   "excite_rate_hz": 30.0,
+   "silenced_groups": [],
+   "brain": {
+    "n_active_neurons": 525,
+    "runtime_s": 14.954,
+    "n_trials": 3,
+    "duration_ms": 1000.0,
+    "key_group_rates_hz": {
+     "GF_L": 71.667,
+     "GF_R": 97.0,
+     "DNg02_L": 0.0,
+     "DNg02_R": 0.0,
+     "DNa01_L": 0.333,
+     "DNa01_R": 0.0,
+     "DNa02_L": 2.667,
+     "DNa02_R": 0.0
+    }
+   },
+   "adapter": {
+    "mode": "flight",
+    "command": {
+     "takeoff": 0.5687,
+     "thrust": 0.0,
+     "yaw": -0.0191,
+     "pitch": 0.0
+    },
+    "walk_drive_if_not_flying": null,
+    "mode_rule": "mode = flight if takeoff = mean(a(GF_L), a(GF_R)) >= 0.5 (= 74 Hz mean GF rate), else walk",
+    "terms": {
+     "takeoff": "mean(a(GF_L)=0.483, a(GF_R)=0.654) = 0.569",
+     "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+     "yaw_components (w*(a_R-a_L))": {
+      "DNa02": -0.018,
+      "DNa01": -0.0011
+     },
+     "yaw_raw": -0.0191,
+     "pitch": "0.0 (no connectome input)"
+    },
+    "takeoff_activation": 0.5687,
+    "explain": {
+     "input_mode": "neuron_rates",
+     "group_rates_hz": {
+      "GF_L": 71.667,
+      "GF_R": 97.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.333,
+      "DNa01_R": 0.0,
+      "DNa02_L": 2.667,
+      "DNa02_R": 0.0
+     },
+     "activation": {
+      "GF_L": 0.4833,
+      "GF_R": 0.6541,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0022,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.018,
+      "DNa02_R": 0.0
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=0.483, a(GF_R)=0.654) = 0.569",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": -0.018,
+       "DNa01": -0.0011
+      },
+      "yaw_raw": -0.0191,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": true,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    },
+    "frozen_hash": "02ef23b1b5d6dca2"
+   },
+   "body": {
+    "behavior": "hover",
+    "airborne": true,
+    "takeoff_time_s": 0.06,
+    "flight_time_s": 0.95,
+    "max_height_mm": 18.185,
+    "final_height_mm": 17.71,
+    "net_displacement_mm": [
+     19.561,
+     3.967,
+     17.71
+    ],
+    "heading_change_deg": 8.58,
+    "mean_speed_mm_s": 33.014,
+    "wing_amplitude_deg": 146.69,
+    "metrics_flight_phase": {
+     "window_s": [
+      0.36,
+      1.0
+     ],
+     "climb_rate_mm_s": -0.352,
+     "forward_speed_mm_s": -3.253,
+     "horizontal_speed_mm_s": 5.501,
+     "yaw_rate_deg_s": 13.391,
+     "heading_change_deg": 8.57
+    },
+    "warnings": null,
+    "runtime_s": 17.33,
+    "wall_per_sim_s": 16.18,
+    "trajectory_downsampled": [
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.03,
+      2.38,
+      -0.36
+     ],
+     [
+      0.05,
+      -0.0,
+      -0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.1,
+      7.54,
+      -0.044,
+      8.412,
+      0.25,
+      36.38,
+      0.13
+     ],
+     [
+      0.16,
+      16.9,
+      0.022,
+      13.45,
+      0.73,
+      49.91,
+      -0.22
+     ],
+     [
+      0.22,
+      20.802,
+      0.274,
+      15.997,
+      0.68,
+      49.73,
+      -0.71
+     ],
+     [
+      0.27,
+      21.666,
+      0.556,
+      17.089,
+      0.71,
+      48.54,
+      -0.73
+     ],
+     [
+      0.32,
+      21.737,
+      0.863,
+      17.676,
+      0.7,
+      47.84,
+      -0.55
+     ],
+     [
+      0.37,
+      21.591,
+      1.178,
+      17.98,
+      0.58,
+      47.59,
+      -0.27
+     ],
+     [
+      0.42,
+      21.414,
+      1.482,
+      18.125,
+      0.55,
+      47.53,
+      0.18
+     ],
+     [
+      0.47,
+      21.242,
+      1.767,
+      18.179,
+      0.51,
+      47.52,
+      0.65
+     ],
+     [
+      0.52,
+      21.074,
+      2.033,
+      18.182,
+      0.51,
+      47.51,
+      1.1
+     ],
+     [
+      0.58,
+      20.874,
+      2.335,
+      18.15,
+      0.46,
+      47.51,
+      1.57
+     ],
+     [
+      0.63,
+      20.711,
+      2.574,
+      18.106,
+      0.47,
+      47.5,
+      1.98
+     ],
+     [
+      0.68,
+      20.553,
+      2.806,
+      18.054,
+      0.48,
+      47.49,
+      2.41
+     ],
+     [
+      0.74,
+      20.37,
+      3.076,
+      17.986,
+      0.45,
+      47.48,
+      2.92
+     ],
+     [
+      0.79,
+      20.223,
+      3.297,
+      17.927,
+      0.83,
+      47.24,
+      3.69
+     ],
+     [
+      0.85,
+      19.943,
+      3.608,
+      17.862,
+      0.18,
+      47.35,
+      4.34
+     ],
+     [
+      0.9,
+      19.709,
+      3.792,
+      17.809,
+      0.01,
+      47.02,
+      5.76
+     ],
+     [
+      0.96,
+      19.585,
+      3.918,
+      17.749,
+      0.05,
+      47.02,
+      7.33
+     ]
+    ]
+   },
+   "expected": "takeoff",
+   "expected_source": "model prediction from the LPLC2 dose-response probe (GF activation above 0.5); no literature ground truth",
+   "as_expected": true,
+   "result_type": "emergent_upstream",
+   "result_type_text": "partly emergent: the GF rate arises from the connectome model (LPLC2 -> GF); the GF -> takeoff step is the adapter (circular)",
+   "checks": [],
+   "gt_id": null,
+   "verification": {
+    "expected_for_verifier": "escape",
+    "final_verdict": "correct",
+    "kinematic": {
+     "verdict": "correct",
+     "checks": [
+      {
+       "name": "airborne_time_s",
+       "value": 0.95,
+       "threshold": ">= 0.05 s with height gain > 1.0 mm",
+       "pass": true
+      },
+      {
+       "name": "final_abs_roll_deg",
+       "value": 0.1,
+       "threshold": "<= 90.0",
+       "pass": true
+      }
+     ],
+     "recomputed": {
+      "duration_s": 1.0,
+      "n_samples": 101,
+      "start_height_mm": 0.0,
+      "max_height_gain_mm": 18.185,
+      "final_height_gain_mm": 17.71,
+      "airborne_time_s": 0.95,
+      "first_airborne_t_s": 0.06,
+      "forward_disp_initial_frame_mm": 19.536,
+      "lateral_disp_initial_frame_mm": 4.09,
+      "dz_mm": 17.71,
+      "horizontal_disp_mm": 19.959,
+      "heading_change_deg": 8.58,
+      "final_abs_roll_deg": 0.1,
+      "max_abs_roll_deg": 1.5
+     },
+     "reason": "all checks passed"
+    },
+    "vision": null,
+    "vision_error": null,
+    "agreement": null,
+    "methods": [
+     "kinematic"
+    ],
+    "reason": "kinematic only (vision disabled): all checks passed",
+    "contact_sheet": null
+   },
+   "video": "assets/flight/LPLC2_30Hz.mp4",
+   "poses": "spikes/flight/out/poses_LPLC2_30Hz.json",
+   "runtimes_s": {
+    "brain": 14.954,
+    "body": 17.33,
+    "total": 32.35
+   },
+   "behavior": "hover",
+   "airborne": true,
+   "max_height_mm": 18.185,
+   "command": {
+    "takeoff": 0.5687,
+    "thrust": 0.0,
+    "yaw": -0.0191,
+    "pitch": 0.0,
+    "explain": {
+     "input_mode": "neuron_rates",
+     "group_rates_hz": {
+      "GF_L": 71.667,
+      "GF_R": 97.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.333,
+      "DNa01_R": 0.0,
+      "DNa02_L": 2.667,
+      "DNa02_R": 0.0
+     },
+     "activation": {
+      "GF_L": 0.4833,
+      "GF_R": 0.6541,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0022,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.018,
+      "DNa02_R": 0.0
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=0.483, a(GF_R)=0.654) = 0.569",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": -0.018,
+       "DNa01": -0.0011
+      },
+      "yaw_raw": -0.0191,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": true,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    }
+   },
+   "key_group_rates_hz": {
+    "GF_L": 71.667,
+    "GF_R": 97.0,
+    "DNg02_L": 0.0,
+    "DNg02_R": 0.0,
+    "DNa01_L": 0.333,
+    "DNa01_R": 0.0,
+    "DNa02_L": 2.667,
+    "DNa02_R": 0.0
+   },
+   "stimulus_type": "upstream (emergent via connectome)",
+   "body_seed_robustness": {
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "hover",
+     "hover",
+     "hover"
+    ],
+    "fraction_same_as_main": 1.0
+   },
+   "verdict": "no_ground_truth"
+  },
+  {
+   "condition": "LPLC2_bilateral",
+   "stimulus": "150 Hz Poisson activation of all LPLC2 (looming-detector) neurons: upstream sensory stand-in for a looming stimulus, not a rendered looming stimulus",
+   "stimulus_groups": [
+    "LPLC2"
+   ],
+   "excite_rate_hz": 150.0,
+   "silenced_groups": [],
+   "brain": {
+    "n_active_neurons": 1121,
+    "runtime_s": 19.876,
+    "n_trials": 3,
+    "duration_ms": 1000.0,
+    "key_group_rates_hz": {
+     "GF_L": 152.0,
+     "GF_R": 169.0,
+     "DNg02_L": 0.0,
+     "DNg02_R": 0.0,
+     "DNa01_L": 1.0,
+     "DNa01_R": 0.0,
+     "DNa02_L": 0.0,
+     "DNa02_R": 0.0
+    }
+   },
+   "adapter": {
+    "mode": "flight",
+    "command": {
+     "takeoff": 1.0,
+     "thrust": 0.0,
+     "yaw": -0.0034,
+     "pitch": 0.0
+    },
+    "walk_drive_if_not_flying": null,
+    "mode_rule": "mode = flight if takeoff = mean(a(GF_L), a(GF_R)) >= 0.5 (= 74 Hz mean GF rate), else walk",
+    "terms": {
+     "takeoff": "mean(a(GF_L)=1.000, a(GF_R)=1.000) = 1.000",
+     "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+     "yaw_components (w*(a_R-a_L))": {
+      "DNa02": 0.0,
+      "DNa01": -0.0034
+     },
+     "yaw_raw": -0.0034,
+     "pitch": "0.0 (no connectome input)"
+    },
+    "takeoff_activation": 1.0,
+    "explain": {
+     "input_mode": "neuron_rates",
+     "group_rates_hz": {
+      "GF_L": 152.0,
+      "GF_R": 169.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 1.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "activation": {
+      "GF_L": 1.0,
+      "GF_R": 1.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0067,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=1.000, a(GF_R)=1.000) = 1.000",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": 0.0,
+       "DNa01": -0.0034
+      },
+      "yaw_raw": -0.0034,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": true,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    },
+    "frozen_hash": "02ef23b1b5d6dca2"
+   },
+   "body": {
+    "behavior": "hover",
+    "airborne": true,
+    "takeoff_time_s": 0.06,
+    "flight_time_s": 0.95,
+    "max_height_mm": 18.188,
+    "final_height_mm": 17.674,
+    "net_displacement_mm": [
+     19.789,
+     3.469,
+     17.674
+    ],
+    "heading_change_deg": 0.02,
+    "mean_speed_mm_s": 32.516,
+    "wing_amplitude_deg": 146.69,
+    "metrics_flight_phase": {
+     "window_s": [
+      0.36,
+      1.0
+     ],
+     "climb_rate_mm_s": -0.409,
+     "forward_speed_mm_s": -2.9,
+     "horizontal_speed_mm_s": 4.775,
+     "yaw_rate_deg_s": 2.281,
+     "heading_change_deg": 1.46
+    },
+    "warnings": null,
+    "runtime_s": 17.3,
+    "wall_per_sim_s": 16.17,
+    "trajectory_downsampled": [
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.03,
+      2.38,
+      -0.36
+     ],
+     [
+      0.05,
+      -0.0,
+      -0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.1,
+      7.54,
+      -0.044,
+      8.412,
+      0.27,
+      36.38,
+      0.0
+     ],
+     [
+      0.16,
+      16.9,
+      0.016,
+      13.451,
+      0.66,
+      49.91,
+      -0.65
+     ],
+     [
+      0.22,
+      20.804,
+      0.254,
+      15.997,
+      0.59,
+      49.73,
+      -1.42
+     ],
+     [
+      0.27,
+      21.669,
+      0.517,
+      17.089,
+      0.57,
+      48.54,
+      -1.69
+     ],
+     [
+      0.32,
+      21.741,
+      0.801,
+      17.677,
+      0.5,
+      47.85,
+      -1.78
+     ],
+     [
+      0.37,
+      21.596,
+      1.087,
+      17.981,
+      0.48,
+      47.57,
+      -1.76
+     ],
+     [
+      0.42,
+      21.428,
+      1.358,
+      18.126,
+      0.36,
+      47.51,
+      -1.59
+     ],
+     [
+      0.47,
+      21.265,
+      1.607,
+      18.181,
+      0.35,
+      47.51,
+      -1.41
+     ],
+     [
+      0.52,
+      21.104,
+      1.836,
+      18.185,
+      0.36,
+      47.51,
+      -1.24
+     ],
+     [
+      0.58,
+      20.916,
+      2.09,
+      18.153,
+      0.28,
+      47.5,
+      -1.1
+     ],
+     [
+      0.63,
+      20.765,
+      2.286,
+      18.109,
+      0.27,
+      47.48,
+      -1.06
+     ],
+     [
+      0.68,
+      20.62,
+      2.472,
+      18.058,
+      0.28,
+      47.48,
+      -0.89
+     ],
+     [
+      0.74,
+      20.455,
+      2.682,
+      17.99,
+      0.28,
+      47.48,
+      -0.74
+     ],
+     [
+      0.79,
+      20.32,
+      2.849,
+      17.931,
+      0.24,
+      47.47,
+      -0.68
+     ],
+     [
+      0.85,
+      20.16,
+      3.037,
+      17.859,
+      0.21,
+      47.46,
+      -0.59
+     ],
+     [
+      0.9,
+      20.032,
+      3.188,
+      17.797,
+      0.23,
+      47.46,
+      -0.49
+     ],
+     [
+      0.96,
+      19.883,
+      3.36,
+      17.723,
+      0.2,
+      47.45,
+      -0.35
+     ]
+    ]
+   },
+   "expected": "takeoff",
+   "expected_source": "literature: Wu et al. 2016 (gt08, LPLC2 activation -> jumping) and Ache et al. 2019 (gt25, LPLC2 -> GF synapses)",
+   "as_expected": true,
+   "result_type": "emergent_upstream",
+   "result_type_text": "partly emergent: the GF rate arises from the connectome model (LPLC2 -> GF); the GF -> takeoff step is the adapter (circular)",
+   "checks": [
+    {
+     "gt_id": "gt08_lplc2_activate_escape",
+     "comparison": "flight body behaviour",
+     "observed": "hover",
+     "expected_behavior": "escape",
+     "effect": "induce",
+     "verdict": "consistent",
+     "reason": "observed behaviour matches"
+    },
+    {
+     "gt_id": "gt25_lplc2_gf_input_ache",
+     "comparison": "flight body behaviour",
+     "observed": "hover",
+     "expected_behavior": "escape",
+     "effect": "induce",
+     "verdict": "consistent",
+     "reason": "observed behaviour matches"
+    }
+   ],
+   "gt_id": "gt08_lplc2_activate_escape",
+   "verification": {
+    "expected_for_verifier": "escape",
+    "final_verdict": "uncertain",
+    "kinematic": {
+     "verdict": "correct",
+     "checks": [
+      {
+       "name": "airborne_time_s",
+       "value": 0.95,
+       "threshold": ">= 0.05 s with height gain > 1.0 mm",
+       "pass": true
+      },
+      {
+       "name": "final_abs_roll_deg",
+       "value": 0.2,
+       "threshold": "<= 90.0",
+       "pass": true
+      }
+     ],
+     "recomputed": {
+      "duration_s": 1.0,
+      "n_samples": 101,
+      "start_height_mm": 0.0,
+      "max_height_gain_mm": 18.188,
+      "final_height_gain_mm": 17.674,
+      "airborne_time_s": 0.95,
+      "first_airborne_t_s": 0.06,
+      "forward_disp_initial_frame_mm": 19.767,
+      "lateral_disp_initial_frame_mm": 3.593,
+      "dz_mm": 17.674,
+      "horizontal_disp_mm": 20.091,
+      "heading_change_deg": 0.02,
+      "final_abs_roll_deg": 0.2,
+      "max_abs_roll_deg": 0.7
+     },
+     "reason": "all checks passed"
+    },
+    "vision": {
+     "verdict": "uncertain",
+     "observed_behavior": "climb",
+     "matches_expected": null,
+     "confidence": 0.6,
+     "observations": [
+      "Tiles 1-2: fly stands on floor, wings starting to move.",
+      "Tiles 3-4: floor horizon drops in frame; camera view rises, fly appears above floor with wings beating.",
+      "Tiles 5-16: floor appears progressively farther below and smaller checker pattern, fly stays centered with wings beating, indicating it is airborne and gaining height.",
+      "No clear lateral rotation of floor pattern indicating a turn; heading roughly constant."
+     ],
+     "fly_visible": true,
+     "model": "claude-opus-5-5",
+     "frames_used": 16,
+     "cached": true,
+     "usage": {
+      "input_tokens": 2492,
+      "output_tokens": 189
+     },
+     "video_sha256": "082fa44568003fabd6a59b46ee8a1e4927b84e7a560398b240b4b9e4a2735a72",
+     "blind": "model saw neither the expected behaviour nor the kinematic numbers"
+    },
+    "vision_error": null,
+    "agreement": false,
+    "methods": [
+     "kinematic",
+     "vision"
+    ],
+    "reason": "kinematic=correct (all checks passed), vision=uncertain (observed climb, conf 0.6)",
+    "contact_sheet": "assets/flight/LPLC2_bilateral_contact.jpg"
+   },
+   "video": "assets/flight/LPLC2_bilateral.mp4",
+   "poses": "spikes/flight/out/poses_LPLC2_bilateral.json",
+   "runtimes_s": {
+    "brain": 19.876,
+    "body": 17.3,
+    "total": 37.66
+   },
+   "behavior": "hover",
+   "airborne": true,
+   "max_height_mm": 18.188,
+   "command": {
+    "takeoff": 1.0,
+    "thrust": 0.0,
+    "yaw": -0.0034,
+    "pitch": 0.0,
+    "explain": {
+     "input_mode": "neuron_rates",
+     "group_rates_hz": {
+      "GF_L": 152.0,
+      "GF_R": 169.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 1.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "activation": {
+      "GF_L": 1.0,
+      "GF_R": 1.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0067,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=1.000, a(GF_R)=1.000) = 1.000",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": 0.0,
+       "DNa01": -0.0034
+      },
+      "yaw_raw": -0.0034,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": true,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    }
+   },
+   "key_group_rates_hz": {
+    "GF_L": 152.0,
+    "GF_R": 169.0,
+    "DNg02_L": 0.0,
+    "DNg02_R": 0.0,
+    "DNa01_L": 1.0,
+    "DNa01_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0
+   },
+   "stimulus_type": "upstream (emergent via connectome)",
+   "body_seed_robustness": {
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "hover",
+     "hover",
+     "hover"
+    ],
+    "fraction_same_as_main": 1.0
+   },
+   "verdict": "consistent"
+  },
+  {
+   "condition": "LPLC2_GF_silenced",
+   "stimulus": "150 Hz LPLC2 activation with the giant fibers silenced (outgoing synapses removed): necessity test",
+   "stimulus_groups": [
+    "LPLC2"
+   ],
+   "excite_rate_hz": 150.0,
+   "silenced_groups": [
+    "GF"
+   ],
+   "brain": {
+    "n_active_neurons": 1157,
+    "runtime_s": 20.029,
+    "n_trials": 3,
+    "duration_ms": 1000.0,
+    "key_group_rates_hz": {
+     "GF_L": 0.0,
+     "GF_R": 0.0,
+     "DNg02_L": 0.0,
+     "DNg02_R": 0.0,
+     "DNa01_L": 0.667,
+     "DNa01_R": 0.333,
+     "DNa02_L": 0.0,
+     "DNa02_R": 0.667
+    }
+   },
+   "adapter": {
+    "mode": "walk",
+    "command": {
+     "takeoff": 0.0,
+     "thrust": 0.0,
+     "yaw": 0.0034,
+     "pitch": 0.0
+    },
+    "walk_drive_if_not_flying": {
+     "forward": 0.0,
+     "turn": 0.0034,
+     "backward": 0.0
+    },
+    "mode_rule": "mode = flight if takeoff = mean(a(GF_L), a(GF_R)) >= 0.5 (= 74 Hz mean GF rate), else walk",
+    "terms": {
+     "takeoff": "mean(a(GF_L)=0.000, a(GF_R)=0.000) = 0.000",
+     "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+     "yaw_components (w*(a_R-a_L))": {
+      "DNa02": 0.0045,
+      "DNa01": -0.0011
+     },
+     "yaw_raw": 0.0034,
+     "pitch": "0.0 (no connectome input)"
+    },
+    "takeoff_activation": 0.0,
+    "explain": {
+     "input_mode": "neuron_rates",
+     "group_rates_hz": {
+      "GF_L": 0.0,
+      "GF_R": 0.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.667,
+      "DNa01_R": 0.333,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.667
+     },
+     "activation": {
+      "GF_L": 0.0,
+      "GF_R": 0.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0045,
+      "DNa01_R": 0.0022,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0045
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=0.000, a(GF_R)=0.000) = 0.000",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": 0.0045,
+       "DNa01": -0.0011
+      },
+      "yaw_raw": 0.0034,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": false,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    },
+    "frozen_hash": "02ef23b1b5d6dca2"
+   },
+   "body": {
+    "behavior": "no_takeoff",
+    "airborne": false,
+    "takeoff_time_s": null,
+    "flight_time_s": 0.0,
+    "max_height_mm": -0.0,
+    "final_height_mm": -0.001,
+    "net_displacement_mm": [
+     -0.0,
+     0.001,
+     -0.001
+    ],
+    "heading_change_deg": 0.02,
+    "mean_speed_mm_s": 0.002,
+    "wing_amplitude_deg": 0.0,
+    "metrics_flight_phase": {
+     "window_s": null
+    },
+    "warnings": null,
+    "runtime_s": 17.03,
+    "wall_per_sim_s": 15.98,
+    "trajectory_downsampled": [
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.03,
+      2.38,
+      -0.36
+     ],
+     [
+      0.05,
+      -0.0,
+      -0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.1,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.16,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.22,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.27,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.32,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.37,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.42,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.47,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.52,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.58,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.63,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.68,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.74,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.79,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.85,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.9,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.96,
+      -0.0,
+      0.001,
+      -0.001,
+      0.03,
+      2.4,
+      -0.34
+     ]
+    ]
+   },
+   "expected": "no_takeoff",
+   "expected_source": "design consequence: GF is the only takeoff trigger in the adapter; no literature ground truth (gt09 silences LPLC2, not GF; real flies also take off via non-GF circuits, von Reyn et al. 2014)",
+   "as_expected": true,
+   "result_type": "circular",
+   "result_type_text": "circular: the adapter maps this neuron population to the command using the same papers that define the ground truth (plumbing / sign check, not a discovery)",
+   "checks": [],
+   "gt_id": null,
+   "verification": {
+    "expected_for_verifier": "no_takeoff",
+    "final_verdict": "correct",
+    "kinematic": {
+     "verdict": "correct",
+     "checks": [
+      {
+       "name": "airborne_time_s",
+       "value": 0.0,
+       "threshold": ">= 0.05 s with height gain > 1.0 mm",
+       "pass": false
+      },
+      {
+       "name": "final_abs_roll_deg",
+       "value": 0.0,
+       "threshold": "<= 90.0",
+       "pass": true
+      }
+     ],
+     "recomputed": {
+      "duration_s": 1.0,
+      "n_samples": 101,
+      "start_height_mm": 0.0,
+      "max_height_gain_mm": 0.0,
+      "final_height_gain_mm": -0.001,
+      "airborne_time_s": 0.0,
+      "first_airborne_t_s": null,
+      "forward_disp_initial_frame_mm": -0.0,
+      "lateral_disp_initial_frame_mm": 0.001,
+      "dz_mm": -0.001,
+      "horizontal_disp_mm": 0.001,
+      "heading_change_deg": 0.02,
+      "final_abs_roll_deg": 0.0,
+      "max_abs_roll_deg": 0.0
+     },
+     "reason": "all checks passed"
+    },
+    "vision": {
+     "verdict": "correct",
+     "observed_behavior": "no_takeoff",
+     "matches_expected": true,
+     "confidence": 0.75,
+     "observations": [
+      "Fly stays at the same position relative to the floor checker pattern in tiles 1-16",
+      "Legs appear in contact with the floor with shadow directly beneath throughout",
+      "No visible gap between legs and floor or rise of body across frames",
+      "Wings show slight pose changes (tiles 5-12) but no displacement results"
+     ],
+     "fly_visible": true,
+     "model": "claude-opus-5-5",
+     "frames_used": 16,
+     "cached": true,
+     "usage": {
+      "input_tokens": 2492,
+      "output_tokens": 142
+     },
+     "video_sha256": "6f238fc4477df5d96a1eeaf1665f90002cea6ec60ccc018e776689faeb1984c6",
+     "blind": "model saw neither the expected behaviour nor the kinematic numbers"
+    },
+    "vision_error": null,
+    "agreement": true,
+    "methods": [
+     "kinematic",
+     "vision"
+    ],
+    "reason": "kinematics and blind vision agree: correct",
+    "contact_sheet": "assets/flight/LPLC2_GF_silenced_contact.jpg"
+   },
+   "video": "assets/flight/LPLC2_GF_silenced.mp4",
+   "poses": "spikes/flight/out/poses_LPLC2_GF_silenced.json",
+   "runtimes_s": {
+    "brain": 20.029,
+    "body": 17.03,
+    "total": 37.36
+   },
+   "behavior": "no_takeoff",
+   "airborne": false,
+   "max_height_mm": -0.0,
+   "command": {
+    "takeoff": 0.0,
+    "thrust": 0.0,
+    "yaw": 0.0034,
+    "pitch": 0.0,
+    "explain": {
+     "input_mode": "neuron_rates",
+     "group_rates_hz": {
+      "GF_L": 0.0,
+      "GF_R": 0.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.667,
+      "DNa01_R": 0.333,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.667
+     },
+     "activation": {
+      "GF_L": 0.0,
+      "GF_R": 0.0,
+      "DNg02_L": 0.0,
+      "DNg02_R": 0.0,
+      "DNa01_L": 0.0045,
+      "DNa01_R": 0.0022,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0045
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=0.000, a(GF_R)=0.000) = 0.000",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": 0.0045,
+       "DNa01": -0.0011
+      },
+      "yaw_raw": 0.0034,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": false,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    }
+   },
+   "key_group_rates_hz": {
+    "GF_L": 0.0,
+    "GF_R": 0.0,
+    "DNg02_L": 0.0,
+    "DNg02_R": 0.0,
+    "DNa01_L": 0.667,
+    "DNa01_R": 0.333,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.667
+   },
+   "stimulus_type": "upstream stimulus, outcome fixed by adapter design (circular)",
+   "necessity_check": {
+    "control_condition": "LPLC2_bilateral",
+    "control_behavior": "hover",
+    "silenced_behavior": "no_takeoff",
+    "informative": true,
+    "result": "takeoff abolished when the GF is silenced",
+    "caveat": "circular by design: GF is the only takeoff trigger in the adapter. Real flies also take off via non-GF circuits (von Reyn et al. 2014), so the real-fly prediction is a reduced probability / long-mode takeoff, not abolition."
+   },
+   "body_seed_robustness": {
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "no_takeoff",
+     "no_takeoff",
+     "no_takeoff"
+    ],
+    "fraction_same_as_main": 1.0
+   },
+   "verdict": "no_ground_truth"
+  },
+  {
+   "condition": "DNg02_only",
+   "stimulus": "150 Hz activation of the DNg02 population without a takeoff trigger",
+   "stimulus_groups": [
+    "DNg02"
+   ],
+   "excite_rate_hz": 150.0,
+   "silenced_groups": [],
+   "brain": {
+    "n_active_neurons": 27,
+    "runtime_s": 10.548,
+    "n_trials": 3,
+    "duration_ms": 1000.0,
+    "key_group_rates_hz": {
+     "GF_L": 0.0,
+     "GF_R": 0.0,
+     "DNg02_L": 149.538,
+     "DNg02_R": 147.583,
+     "DNa01_L": 0.0,
+     "DNa01_R": 0.0,
+     "DNa02_L": 0.0,
+     "DNa02_R": 0.0
+    }
+   },
+   "adapter": {
+    "mode": "walk",
+    "command": {
+     "takeoff": 0.0,
+     "thrust": 1.0,
+     "yaw": 0.0,
+     "pitch": 0.0
+    },
+    "walk_drive_if_not_flying": {
+     "forward": 0.0,
+     "turn": 0.0,
+     "backward": 0.0
+    },
+    "mode_rule": "mode = flight if takeoff = mean(a(GF_L), a(GF_R)) >= 0.5 (= 74 Hz mean GF rate), else walk",
+    "terms": {
+     "takeoff": "mean(a(GF_L)=0.000, a(GF_R)=0.000) = 0.000",
+     "thrust": "0.0 + 1.0 * a(DNg02 population 148.60 Hz; n_L=13, n_R=12) = 1.000",
+     "yaw_components (w*(a_R-a_L))": {
+      "DNa02": 0.0,
+      "DNa01": 0.0
+     },
+     "yaw_raw": 0.0,
+     "pitch": "0.0 (no connectome input)"
+    },
+    "takeoff_activation": 0.0,
+    "explain": {
+     "input_mode": "neuron_rates",
+     "group_rates_hz": {
+      "GF_L": 0.0,
+      "GF_R": 0.0,
+      "DNg02_L": 149.538,
+      "DNg02_R": 147.583,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "activation": {
+      "GF_L": 0.0,
+      "GF_R": 0.0,
+      "DNg02_L": 1.0,
+      "DNg02_R": 0.9952,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=0.000, a(GF_R)=0.000) = 0.000",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 148.60 Hz; n_L=13, n_R=12) = 1.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": 0.0,
+       "DNa01": 0.0
+      },
+      "yaw_raw": 0.0,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": false,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    },
+    "frozen_hash": "02ef23b1b5d6dca2"
+   },
+   "body": {
+    "behavior": "no_takeoff",
+    "airborne": false,
+    "takeoff_time_s": null,
+    "flight_time_s": 0.0,
+    "max_height_mm": -0.0,
+    "final_height_mm": -0.001,
+    "net_displacement_mm": [
+     -0.0,
+     0.001,
+     -0.001
+    ],
+    "heading_change_deg": 0.02,
+    "mean_speed_mm_s": 0.002,
+    "wing_amplitude_deg": 0.0,
+    "metrics_flight_phase": {
+     "window_s": null
+    },
+    "warnings": null,
+    "runtime_s": 16.65,
+    "wall_per_sim_s": 15.58,
+    "trajectory_downsampled": [
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.03,
+      2.38,
+      -0.36
+     ],
+     [
+      0.05,
+      -0.0,
+      -0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.1,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.16,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.22,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.27,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.32,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.37,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.36
+     ],
+     [
+      0.42,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.47,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.52,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.58,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.63,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.68,
+      -0.0,
+      0.0,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.74,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.79,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.85,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.9,
+      -0.0,
+      0.001,
+      -0.0,
+      0.03,
+      2.4,
+      -0.35
+     ],
+     [
+      0.96,
+      -0.0,
+      0.001,
+      -0.001,
+      0.03,
+      2.4,
+      -0.34
+     ]
+    ]
+   },
+   "expected": "no_takeoff",
+   "expected_source": "design consequence: thrust acts only after a GF takeoff (Namiki et al. activated DNg02 in flying flies)",
+   "as_expected": true,
+   "result_type": "circular",
+   "result_type_text": "circular: the adapter maps this neuron population to the command using the same papers that define the ground truth (plumbing / sign check, not a discovery)",
+   "checks": [],
+   "gt_id": null,
+   "verification": {
+    "expected_for_verifier": "no_takeoff",
+    "final_verdict": "correct",
+    "kinematic": {
+     "verdict": "correct",
+     "checks": [
+      {
+       "name": "airborne_time_s",
+       "value": 0.0,
+       "threshold": ">= 0.05 s with height gain > 1.0 mm",
+       "pass": false
+      },
+      {
+       "name": "final_abs_roll_deg",
+       "value": 0.0,
+       "threshold": "<= 90.0",
+       "pass": true
+      }
+     ],
+     "recomputed": {
+      "duration_s": 1.0,
+      "n_samples": 101,
+      "start_height_mm": 0.0,
+      "max_height_gain_mm": 0.0,
+      "final_height_gain_mm": -0.001,
+      "airborne_time_s": 0.0,
+      "first_airborne_t_s": null,
+      "forward_disp_initial_frame_mm": -0.0,
+      "lateral_disp_initial_frame_mm": 0.001,
+      "dz_mm": -0.001,
+      "horizontal_disp_mm": 0.001,
+      "heading_change_deg": 0.02,
+      "final_abs_roll_deg": 0.0,
+      "max_abs_roll_deg": 0.0
+     },
+     "reason": "all checks passed"
+    },
+    "vision": null,
+    "vision_error": null,
+    "agreement": null,
+    "methods": [
+     "kinematic"
+    ],
+    "reason": "kinematic only (vision disabled): all checks passed",
+    "contact_sheet": null
+   },
+   "video": "assets/flight/DNg02_only.mp4",
+   "poses": "spikes/flight/out/poses_DNg02_only.json",
+   "runtimes_s": {
+    "brain": 10.548,
+    "body": 16.65,
+    "total": 27.26
+   },
+   "behavior": "no_takeoff",
+   "airborne": false,
+   "max_height_mm": -0.0,
+   "command": {
+    "takeoff": 0.0,
+    "thrust": 1.0,
+    "yaw": 0.0,
+    "pitch": 0.0,
+    "explain": {
+     "input_mode": "neuron_rates",
+     "group_rates_hz": {
+      "GF_L": 0.0,
+      "GF_R": 0.0,
+      "DNg02_L": 149.538,
+      "DNg02_R": 147.583,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "activation": {
+      "GF_L": 0.0,
+      "GF_R": 0.0,
+      "DNg02_L": 1.0,
+      "DNg02_R": 0.9952,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=0.000, a(GF_R)=0.000) = 0.000",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 148.60 Hz; n_L=13, n_R=12) = 1.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": 0.0,
+       "DNa01": 0.0
+      },
+      "yaw_raw": 0.0,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": false,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    }
+   },
+   "key_group_rates_hz": {
+    "GF_L": 0.0,
+    "GF_R": 0.0,
+    "DNg02_L": 149.538,
+    "DNg02_R": 147.583,
+    "DNa01_L": 0.0,
+    "DNa01_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0
+   },
+   "stimulus_type": "direct DN (partly circular)",
+   "body_seed_robustness": {
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "no_takeoff",
+     "no_takeoff",
+     "no_takeoff"
+    ],
+    "fraction_same_as_main": 1.0
+   },
+   "verdict": "no_ground_truth"
+  },
+  {
+   "condition": "GF_DNg02",
+   "stimulus": "150 Hz activation of both giant fibers plus the DNg02 population",
+   "stimulus_groups": [
+    "GF",
+    "DNg02"
+   ],
+   "excite_rate_hz": 150.0,
+   "silenced_groups": [],
+   "brain": {
+    "n_active_neurons": 58,
+    "runtime_s": 11.346,
+    "n_trials": 3,
+    "duration_ms": 1000.0,
+    "key_group_rates_hz": {
+     "GF_L": 168.667,
+     "GF_R": 152.0,
+     "DNg02_L": 148.359,
+     "DNg02_R": 148.861,
+     "DNa01_L": 0.0,
+     "DNa01_R": 0.0,
+     "DNa02_L": 0.0,
+     "DNa02_R": 0.0
+    }
+   },
+   "adapter": {
+    "mode": "flight",
+    "command": {
+     "takeoff": 1.0,
+     "thrust": 1.0,
+     "yaw": 0.0,
+     "pitch": 0.0
+    },
+    "walk_drive_if_not_flying": null,
+    "mode_rule": "mode = flight if takeoff = mean(a(GF_L), a(GF_R)) >= 0.5 (= 74 Hz mean GF rate), else walk",
+    "terms": {
+     "takeoff": "mean(a(GF_L)=1.000, a(GF_R)=1.000) = 1.000",
+     "thrust": "0.0 + 1.0 * a(DNg02 population 148.60 Hz; n_L=13, n_R=12) = 1.000",
+     "yaw_components (w*(a_R-a_L))": {
+      "DNa02": 0.0,
+      "DNa01": 0.0
+     },
+     "yaw_raw": 0.0,
+     "pitch": "0.0 (no connectome input)"
+    },
+    "takeoff_activation": 1.0,
+    "explain": {
+     "input_mode": "neuron_rates",
+     "group_rates_hz": {
+      "GF_L": 168.667,
+      "GF_R": 152.0,
+      "DNg02_L": 148.359,
+      "DNg02_R": 148.861,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "activation": {
+      "GF_L": 1.0,
+      "GF_R": 1.0,
+      "DNg02_L": 1.0,
+      "DNg02_R": 1.0,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=1.000, a(GF_R)=1.000) = 1.000",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 148.60 Hz; n_L=13, n_R=12) = 1.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": 0.0,
+       "DNa01": 0.0
+      },
+      "yaw_raw": 0.0,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": true,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    },
+    "frozen_hash": "02ef23b1b5d6dca2"
+   },
+   "body": {
+    "behavior": "climb",
+    "airborne": true,
+    "takeoff_time_s": 0.06,
+    "flight_time_s": 0.95,
+    "max_height_mm": 183.365,
+    "final_height_mm": 183.365,
+    "net_displacement_mm": [
+     19.667,
+     1.207,
+     183.365
+    ],
+    "heading_change_deg": 8.94,
+    "mean_speed_mm_s": 190.987,
+    "wing_amplitude_deg": 164.3,
+    "metrics_flight_phase": {
+     "window_s": [
+      0.36,
+      1.0
+     ],
+     "climb_rate_mm_s": 193.969,
+     "forward_speed_mm_s": -1.318,
+     "horizontal_speed_mm_s": 1.371,
+     "yaw_rate_deg_s": 10.516,
+     "heading_change_deg": 6.73
+    },
+    "warnings": null,
+    "runtime_s": 17.69,
+    "wall_per_sim_s": 16.57,
+    "trajectory_downsampled": [
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.03,
+      2.38,
+      -0.36
+     ],
+     [
+      0.05,
+      -0.0,
+      -0.0,
+      -0.0,
+      0.03,
+      2.39,
+      -0.36
+     ],
+     [
+      0.1,
+      8.176,
+      -0.032,
+      9.64,
+      0.54,
+      36.79,
+      -0.37
+     ],
+     [
+      0.16,
+      18.079,
+      0.115,
+      20.777,
+      0.52,
+      50.69,
+      -0.85
+     ],
+     [
+      0.22,
+      21.259,
+      0.506,
+      32.233,
+      1.1,
+      50.0,
+      -0.99
+     ],
+     [
+      0.27,
+      21.326,
+      0.968,
+      41.843,
+      0.23,
+      48.51,
+      -0.42
+     ],
+     [
+      0.32,
+      20.821,
+      1.308,
+      51.489,
+      -0.29,
+      47.35,
+      0.68
+     ],
+     [
+      0.37,
+      20.457,
+      1.463,
+      61.16,
+      -0.2,
+      47.05,
+      2.0
+     ],
+     [
+      0.42,
+      20.258,
+      1.515,
+      70.847,
+      -0.1,
+      47.17,
+      3.3
+     ],
+     [
+      0.47,
+      20.144,
+      1.532,
+      80.539,
+      -0.09,
+      47.12,
+      4.36
+     ],
+     [
+      0.52,
+      20.084,
+      1.536,
+      90.236,
+      -0.03,
+      47.18,
+      5.07
+     ],
+     [
+      0.58,
+      20.026,
+      1.522,
+      101.875,
+      -0.11,
+      47.17,
+      5.86
+     ],
+     [
+      0.63,
+      19.984,
+      1.5,
+      111.575,
+      -0.12,
+      47.17,
+      6.45
+     ],
+     [
+      0.68,
+      19.945,
+      1.469,
+      121.276,
+      -0.08,
+      47.16,
+      6.85
+     ],
+     [
+      0.74,
+      19.895,
+      1.42,
+      132.918,
+      -0.14,
+      47.16,
+      7.24
+     ],
+     [
+      0.79,
+      19.855,
+      1.374,
+      142.619,
+      -0.11,
+      47.05,
+      7.53
+     ],
+     [
+      0.85,
+      19.818,
+      1.318,
+      154.261,
+      -0.1,
+      47.18,
+      7.85
+     ],
+     [
+      0.9,
+      19.776,
+      1.282,
+      163.963,
+      -0.0,
+      47.21,
+      8.18
+     ],
+     [
+      0.96,
+      19.711,
+      1.239,
+      175.604,
+      -0.24,
+      47.14,
+      8.32
+     ]
+    ],
+    "amplitude_ratio_vs_GF_only": 1.12,
+    "climb_rate_mm_s": 193.969
+   },
+   "expected": "takeoff",
+   "expected_source": "literature: Namiki et al. 2022 (gt26, DNg02 population -> wingbeat amplitude), Lima & Miesenboeck 2005 (gt07)",
+   "as_expected": true,
+   "result_type": "circular",
+   "result_type_text": "circular: the adapter maps this neuron population to the command using the same papers that define the ground truth (plumbing / sign check, not a discovery)",
+   "checks": [
+    {
+     "gt_id": "gt07_gf_activate_escape",
+     "comparison": "flight body behaviour",
+     "observed": "climb",
+     "expected_behavior": "escape",
+     "effect": "induce",
+     "verdict": "consistent",
+     "reason": "observed behaviour matches"
+    },
+    {
+     "gt_id": "gt26_dng02_activate_wingbeat_amplitude",
+     "comparison": "wingbeat amplitude vs GF-only run",
+     "observed": "flight_power",
+     "amplitude_ratio_vs_GF_only": 1.12,
+     "amplitude_threshold": 1.05,
+     "expected_behavior": "flight_power",
+     "effect": "induce",
+     "verdict": "consistent",
+     "reason": "observed behaviour matches (amplitude 164.3 vs 146.69 deg, ratio 1.120; the thrust gain is a design constant, so this is partly circular)"
+    }
+   ],
+   "gt_id": "gt07_gf_activate_escape",
+   "verification": {
+    "expected_for_verifier": "escape",
+    "final_verdict": "correct",
+    "kinematic": {
+     "verdict": "correct",
+     "checks": [
+      {
+       "name": "airborne_time_s",
+       "value": 0.95,
+       "threshold": ">= 0.05 s with height gain > 1.0 mm",
+       "pass": true
+      },
+      {
+       "name": "final_abs_roll_deg",
+       "value": 0.0,
+       "threshold": "<= 90.0",
+       "pass": true
+      }
+     ],
+     "recomputed": {
+      "duration_s": 1.0,
+      "n_samples": 101,
+      "start_height_mm": 0.0,
+      "max_height_gain_mm": 183.365,
+      "final_height_gain_mm": 183.365,
+      "airborne_time_s": 0.95,
+      "first_airborne_t_s": 0.06,
+      "forward_disp_initial_frame_mm": 19.659,
+      "lateral_disp_initial_frame_mm": 1.331,
+      "dz_mm": 183.365,
+      "horizontal_disp_mm": 19.704,
+      "heading_change_deg": 8.94,
+      "final_abs_roll_deg": 0.0,
+      "max_abs_roll_deg": 1.2
+     },
+     "reason": "all checks passed"
+    },
+    "vision": null,
+    "vision_error": null,
+    "agreement": null,
+    "methods": [
+     "kinematic"
+    ],
+    "reason": "kinematic only (vision disabled): all checks passed",
+    "contact_sheet": null
+   },
+   "video": "assets/flight/GF_DNg02.mp4",
+   "poses": "spikes/flight/out/poses_GF_DNg02.json",
+   "runtimes_s": {
+    "brain": 11.346,
+    "body": 17.69,
+    "total": 29.1
+   },
+   "behavior": "climb",
+   "airborne": true,
+   "max_height_mm": 183.365,
+   "command": {
+    "takeoff": 1.0,
+    "thrust": 1.0,
+    "yaw": 0.0,
+    "pitch": 0.0,
+    "explain": {
+     "input_mode": "neuron_rates",
+     "group_rates_hz": {
+      "GF_L": 168.667,
+      "GF_R": 152.0,
+      "DNg02_L": 148.359,
+      "DNg02_R": 148.861,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "activation": {
+      "GF_L": 1.0,
+      "GF_R": 1.0,
+      "DNg02_L": 1.0,
+      "DNg02_R": 1.0,
+      "DNa01_L": 0.0,
+      "DNa01_R": 0.0,
+      "DNa02_L": 0.0,
+      "DNa02_R": 0.0
+     },
+     "ref_rate_hz": 148.3,
+     "terms": {
+      "takeoff": "mean(a(GF_L)=1.000, a(GF_R)=1.000) = 1.000",
+      "thrust": "0.0 + 1.0 * a(DNg02 population 148.60 Hz; n_L=13, n_R=12) = 1.000",
+      "yaw_components (w*(a_R-a_L))": {
+       "DNa02": 0.0,
+       "DNa01": 0.0
+      },
+      "yaw_raw": 0.0,
+      "pitch": "0.0 (no connectome input)"
+     },
+     "takeoff_threshold": 0.5,
+     "takeoff_triggered": true,
+     "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+     "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+     "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+     "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+     "frozen": {
+      "version": "flight-adapter-v1",
+      "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+      "parameter_hash": "02ef23b1b5d6dca2",
+      "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+     },
+     "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+    }
+   },
+   "key_group_rates_hz": {
+    "GF_L": 168.667,
+    "GF_R": 152.0,
+    "DNg02_L": 148.359,
+    "DNg02_R": 148.861,
+    "DNa01_L": 0.0,
+    "DNa01_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0
+   },
+   "stimulus_type": "direct DN (partly circular)",
+   "body_seed_robustness": {
+    "seeds": [
+     1,
+     2,
+     3
+    ],
+    "labels": [
+     "climb",
+     "climb",
+     "climb"
+    ],
+    "fraction_same_as_main": 1.0
+   },
+   "verdict": "consistent"
+  }
+ ],
+ "summary": {
+  "n_conditions": 8,
+  "n_as_expected": 8,
+  "n_gt_checks": 6,
+  "n_comparable": 6,
+  "n_consistent": 6,
+  "verdicts": {
+   "GF_bilateral:gt07_gf_activate_escape": "consistent",
+   "GF_bilateral:gt24_gf_activate_takeoff_vonreyn": "consistent",
+   "LPLC2_bilateral:gt08_lplc2_activate_escape": "consistent",
+   "LPLC2_bilateral:gt25_lplc2_gf_input_ache": "consistent",
+   "GF_DNg02:gt07_gf_activate_escape": "consistent",
+   "GF_DNg02:gt26_dng02_activate_wingbeat_amplitude": "consistent"
+  },
+  "verification": {
+   "control": "correct",
+   "GF_bilateral": "correct",
+   "LPLC2_10Hz": "correct",
+   "LPLC2_30Hz": "correct",
+   "LPLC2_bilateral": "uncertain",
+   "LPLC2_GF_silenced": "correct",
+   "DNg02_only": "correct",
+   "GF_DNg02": "correct"
+  },
+  "n_vision_checked": 2,
+  "vision_verdicts": {
+   "LPLC2_bilateral": "uncertain",
+   "LPLC2_GF_silenced": "correct"
+  },
+  "airborne": {
+   "control": false,
+   "GF_bilateral": true,
+   "LPLC2_10Hz": false,
+   "LPLC2_30Hz": true,
+   "LPLC2_bilateral": true,
+   "LPLC2_GF_silenced": false,
+   "DNg02_only": false,
+   "GF_DNg02": true
+  },
+  "gf_rate_hz_mean": {
+   "control": 0.0,
+   "GF_bilateral": 169.3,
+   "LPLC2_10Hz": 36.2,
+   "LPLC2_30Hz": 84.3,
+   "LPLC2_bilateral": 160.5,
+   "LPLC2_GF_silenced": 0.0,
+   "DNg02_only": 0.0,
+   "GF_DNg02": 160.3
+  },
+  "total_wall_s": 370.1
+ },
+ "lplc2_dose_response": {
+  "what": "LPLC2 Poisson drive -> GF firing -> takeoff activation of the frozen flight adapter (brain + bridge, no body)",
+  "protocol": {
+   "brain_duration_ms": 1000.0,
+   "n_trials": 3,
+   "seed": 0,
+   "target": "all LPLC2 neurons",
+   "takeoff_threshold": 0.5
+  },
+  "rows": [
+   {
+    "lplc2_rate_hz": 5.0,
+    "gf_l_hz": 8.333,
+    "gf_r_hz": 16.667,
+    "takeoff_activation": 0.0843,
+    "takeoff_triggered": false,
+    "n_active_neurons": 310
+   },
+   {
+    "lplc2_rate_hz": 10.0,
+    "gf_l_hz": 22.333,
+    "gf_r_hz": 50.0,
+    "takeoff_activation": 0.2439,
+    "takeoff_triggered": false,
+    "n_active_neurons": 398
+   },
+   {
+    "lplc2_rate_hz": 15.0,
+    "gf_l_hz": 40.333,
+    "gf_r_hz": 66.333,
+    "takeoff_activation": 0.3596,
+    "takeoff_triggered": false,
+    "n_active_neurons": 427
+   },
+   {
+    "lplc2_rate_hz": 20.0,
+    "gf_l_hz": 55.333,
+    "gf_r_hz": 79.0,
+    "takeoff_activation": 0.4529,
+    "takeoff_triggered": false,
+    "n_active_neurons": 463
+   },
+   {
+    "lplc2_rate_hz": 25.0,
+    "gf_l_hz": 64.667,
+    "gf_r_hz": 88.333,
+    "takeoff_activation": 0.5158,
+    "takeoff_triggered": true,
+    "n_active_neurons": 479
+   },
+   {
+    "lplc2_rate_hz": 30.0,
+    "gf_l_hz": 71.667,
+    "gf_r_hz": 97.0,
+    "takeoff_activation": 0.5687,
+    "takeoff_triggered": true,
+    "n_active_neurons": 525
+   },
+   {
+    "lplc2_rate_hz": 40.0,
+    "gf_l_hz": 87.0,
+    "gf_r_hz": 108.0,
+    "takeoff_activation": 0.6575,
+    "takeoff_triggered": true,
+    "n_active_neurons": 570
+   },
+   {
+    "lplc2_rate_hz": 50.0,
+    "gf_l_hz": 98.667,
+    "gf_r_hz": 117.667,
+    "takeoff_activation": 0.7294,
+    "takeoff_triggered": true,
+    "n_active_neurons": 647
+   },
+   {
+    "lplc2_rate_hz": 75.0,
+    "gf_l_hz": 116.333,
+    "gf_r_hz": 135.0,
+    "takeoff_activation": 0.8474,
+    "takeoff_triggered": true,
+    "n_active_neurons": 759
+   },
+   {
+    "lplc2_rate_hz": 100.0,
+    "gf_l_hz": 129.667,
+    "gf_r_hz": 148.0,
+    "takeoff_activation": 0.9362,
+    "takeoff_triggered": true,
+    "n_active_neurons": 865
+   },
+   {
+    "lplc2_rate_hz": 150.0,
+    "gf_l_hz": 152.0,
+    "gf_r_hz": 169.0,
+    "takeoff_activation": 1.0,
+    "takeoff_triggered": true,
+    "n_active_neurons": 1121
+   }
+  ],
+  "takeoff_threshold_lplc2_rate_hz_interpolated": 23.7,
+  "note": "GF firing is graded (not all-or-none) in the LIF model; the takeoff threshold of the adapter (half the reference rate) is hand-chosen. Poisson rates are a stand-in for looming strength, not a calibrated stimulus."
+ }
+}

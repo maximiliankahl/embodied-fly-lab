@@ -1,0 +1,1152 @@
+{
+ "inputs": {
+  "excite": [
+   "LPLC2"
+  ],
+  "silence": [
+   "GF"
+  ],
+  "rate_hz": 150.0,
+  "duration_ms": 1000.0,
+  "n_trials": 3,
+  "duration_s": 1,
+  "seed": 1
+ },
+ "excite_groups": {
+  "LPLC2": 210
+ },
+ "silence_groups": {
+  "GF": 2
+ },
+ "unknown_groups": [],
+ "n_excited": 210,
+ "n_silenced": 2,
+ "descending_group_rates_hz": {
+  "MDN": 0.0,
+  "MDN_L": 0.0,
+  "MDN_R": 0.0,
+  "P9": 0.0,
+  "P9_L": 0.0,
+  "P9_R": 0.0,
+  "DNa01": 1.167,
+  "DNa01_L": 2.333,
+  "DNa01_R": 0.0,
+  "DNa02": 0.0,
+  "DNa02_L": 0.0,
+  "DNa02_R": 0.0,
+  "GF": 0.0,
+  "GF_L": 0.0,
+  "GF_R": 0.0,
+  "DNg02": 0.0,
+  "DNg02_L": 0.0,
+  "DNg02_R": 0.0,
+  "DNg11": 0.0,
+  "DNg11_L": 0.0,
+  "DNg11_R": 0.0,
+  "DNg07": 0.0,
+  "DNg07_L": 0.0,
+  "DNg07_R": 0.0,
+  "aDN1_shiu2024": 0.0,
+  "aDN2_shiu2024": 0.0
+ },
+ "command": {
+  "takeoff": 0.0,
+  "thrust": 0.0,
+  "yaw": -0.0079,
+  "pitch": 0.0,
+  "explain": {
+   "input_mode": "neuron_rates",
+   "group_rates_hz": {
+    "GF_L": 0.0,
+    "GF_R": 0.0,
+    "DNg02_L": 0.0,
+    "DNg02_R": 0.0,
+    "DNa01_L": 2.333,
+    "DNa01_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0
+   },
+   "activation": {
+    "GF_L": 0.0,
+    "GF_R": 0.0,
+    "DNg02_L": 0.0,
+    "DNg02_R": 0.0,
+    "DNa01_L": 0.0157,
+    "DNa01_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0
+   },
+   "ref_rate_hz": 148.3,
+   "terms": {
+    "takeoff": "mean(a(GF_L)=0.000, a(GF_R)=0.000) = 0.000",
+    "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+    "yaw_components (w*(a_R-a_L))": {
+     "DNa02": 0.0,
+     "DNa01": -0.0079
+    },
+    "yaw_raw": -0.0079,
+    "pitch": "0.0 (no connectome input)"
+   },
+   "takeoff_threshold": 0.5,
+   "takeoff_triggered": false,
+   "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+   "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+   "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+   "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+   "frozen": {
+    "version": "flight-adapter-v1",
+    "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+    "parameter_hash": "02ef23b1b5d6dca2",
+    "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+   },
+   "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+  }
+ },
+ "bridge": {
+  "bridge": "flylab.bridge.rates_to_flight_command",
+  "adapter": {
+   "version": "flight-adapter-v1",
+   "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+   "parameter_hash": "02ef23b1b5d6dca2",
+   "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+  },
+  "explain": {
+   "input_mode": "neuron_rates",
+   "group_rates_hz": {
+    "GF_L": 0.0,
+    "GF_R": 0.0,
+    "DNg02_L": 0.0,
+    "DNg02_R": 0.0,
+    "DNa01_L": 2.333,
+    "DNa01_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0
+   },
+   "activation": {
+    "GF_L": 0.0,
+    "GF_R": 0.0,
+    "DNg02_L": 0.0,
+    "DNg02_R": 0.0,
+    "DNa01_L": 0.0157,
+    "DNa01_R": 0.0,
+    "DNa02_L": 0.0,
+    "DNa02_R": 0.0
+   },
+   "ref_rate_hz": 148.3,
+   "terms": {
+    "takeoff": "mean(a(GF_L)=0.000, a(GF_R)=0.000) = 0.000",
+    "thrust": "0.0 + 1.0 * a(DNg02 population 0.00 Hz; n_L=13, n_R=12) = 0.000",
+    "yaw_components (w*(a_R-a_L))": {
+     "DNa02": 0.0,
+     "DNa01": -0.0079
+    },
+    "yaw_raw": -0.0079,
+    "pitch": "0.0 (no connectome input)"
+   },
+   "takeoff_threshold": 0.5,
+   "takeoff_triggered": false,
+   "thrust_applies_only_when_airborne": "flylab.flight beats the wings only after a takeoff trigger; without GF-driven takeoff the thrust value has no effect",
+   "formula": "a=min(1,rate/ref); takeoff=mean(a(GF_L),a(GF_R)) [flight if >= 0.5]; thrust=a(DNg02 population); yaw=clip(1.0*dDNa02+0.5*dDNa01,-1,1) [transfer assumption]; pitch=0",
+   "connectome_decides": "takeoff trigger (GF), wingbeat-amplitude increment (DNg02), left/right steering asymmetry",
+   "hand_designed": "jump impulse, wing kinematics, attitude/heading stabilisation, baseline flight-motor drive, quasi-steady aerodynamics (flylab.flight.model_notes())",
+   "frozen": {
+    "version": "flight-adapter-v1",
+    "frozen_at": "2026-10-04 08:55 (before the flight_validation.json runs)",
+    "parameter_hash": "02ef23b1b5d6dca2",
+    "note": "Parameters are frozen before the comparison runs (team rule G3). The validation JSON records the hash; a changed hash means the adapter was modified after the comparison."
+   },
+   "note": "hand-designed VNC replacement (FlyWire covers the brain only); open loop, constant command from time-averaged rates"
+  }
+ },
+ "flight": {
+  "command": {
+   "takeoff": 0.0,
+   "thrust": 0.0,
+   "yaw": -0.0079,
+   "pitch": 0.0
+  },
+  "trajectory": [
+   [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.05,
+    2.38,
+    -0.44
+   ],
+   [
+    0.01,
+    -0.0,
+    -0.0,
+    -0.0,
+    0.04,
+    2.38,
+    -0.44
+   ],
+   [
+    0.02,
+    -0.0,
+    -0.0,
+    -0.0,
+    0.04,
+    2.38,
+    -0.44
+   ],
+   [
+    0.03,
+    -0.0,
+    -0.0,
+    -0.0,
+    0.04,
+    2.38,
+    -0.44
+   ],
+   [
+    0.04,
+    -0.0,
+    -0.0,
+    -0.0,
+    0.04,
+    2.38,
+    -0.44
+   ],
+   [
+    0.05,
+    -0.0,
+    -0.0,
+    -0.0,
+    0.04,
+    2.38,
+    -0.44
+   ],
+   [
+    0.06,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.07,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.08,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.09,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.1,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.11,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.12,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.13,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.14,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.15,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.16,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.17,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.18,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.19,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.2,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.21,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.22,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.23,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.24,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.25,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.26,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.27,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.28,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.39,
+    -0.44
+   ],
+   [
+    0.29,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.3,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.31,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.32,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.33,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.34,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.35,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.36,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.37,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.38,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.39,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.4,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.41,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.42,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.43,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.44,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.45,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.46,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.47,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.48,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.49,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.5,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.51,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.52,
+    -0.0,
+    0.0,
+    -0.0,
+    0.04,
+    2.4,
+    -0.44
+   ],
+   [
+    0.53,
+    -0.0,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.54,
+    -0.0,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.55,
+    -0.0,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.56,
+    -0.0,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.57,
+    -0.0,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.58,
+    -0.0,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.59,
+    -0.0,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.6,
+    -0.0,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.61,
+    -0.0,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.62,
+    -0.0,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.63,
+    -0.0,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.64,
+    -0.0,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.65,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.66,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.67,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.68,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.69,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.7,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.71,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.72,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.73,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.74,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.75,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.76,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.77,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.78,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.79,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.8,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.44
+   ],
+   [
+    0.81,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.82,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.83,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.84,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.85,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.86,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.87,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.88,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.89,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.9,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.91,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.92,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.93,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.94,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.95,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.96,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.97,
+    -0.001,
+    0.0,
+    0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.98,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    0.99,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.43
+   ],
+   [
+    1.0,
+    -0.001,
+    0.0,
+    -0.0,
+    0.03,
+    2.4,
+    -0.43
+   ]
+  ],
+  "airborne": false,
+  "takeoff_time_s": null,
+  "flight_time_s": 0.0,
+  "max_height_mm": -0.0,
+  "final_height_mm": -0.0,
+  "net_displacement_mm": [
+   -0.001,
+   0.0,
+   -0.0
+  ],
+  "heading_change_deg": 0.01,
+  "mean_speed_mm_s": 0.001,
+  "wing_amplitude_deg": 0.0,
+  "phi_hover_deg": 147.29,
+  "stroke_saturation_fraction": 0.0,
+  "min_stroke_normal_up_cos": 1.0,
+  "mass_mg": 0.9846,
+  "weight_dyn": 0.96591,
+  "sim_duration_s": 1.0,
+  "video": "C:/Users/mkahl/Hackathon/HackNation-7/02_App/runs/20261004-093251-which-visual-neurons-trigger-esc-9460/artifacts/flight_02.mp4",
+  "runtime_s": 5.49,
+  "wall_per_sim_s": 5.05,
+  "conventions": "trajectory [t, x_mm, y_mm, z_mm, roll_deg, pitch_deg, yaw_deg]: thorax position relative to the start (world frame, start heading ~ +x), z = height gain above the standing height; pitch + = nose up; yaw unwrapped, CCW + = LEFT turn (same as heading_change_deg). Video/poses are stroboscopic (wingbeat appears slowed).",
+  "model_notes": {
+   "body": "FlyBody (Vaxenburg et al. 2025, Nature, doi:10.1038/s41586-025-09029-4), original fruitfly.xml from flygym 2.1 with full-size meshes; MuJoCo rigid-body physics, ground contact, gravity.",
+   "approach": "B: wingbeat-cycle-averaged quasi-steady aerodynamics applied as forces/torques (mj_applyFT); MuJoCo fluid model off. Approach A (MuJoCo fluid forces on flapping wings) not completed in the time box.",
+   "physics": [
+    "rigid-body dynamics of the whole fly (MuJoCo, dt 0.1 ms)",
+    "gravity and ground contact",
+    "quasi-steady mean lift L = 0.5 rho C_L S <U2^2> per wing at a centre of pressure (roll/pitch torques emerge from left/right lift difference and fore/aft centre-of-pressure shift)",
+    "flapping counter-force damping (translational and rotational)",
+    "jump impulse integration",
+    "wing joint servo dynamics (wings flap at 200 Hz; visual realism, no fluid force from them)"
+   ],
+   "aero_parameters": {
+    "rho_g_cm3": 0.00128,
+    "wing_area_mm2": 1.973,
+    "wing_length_mm": 2.28,
+    "r2_mm": 1.275,
+    "freq_hz": 200.0,
+    "alpha_deg": 45.0,
+    "C_L": 1.805,
+    "C_D": 1.704,
+    "C_L_C_D_source": "Dickinson, Lehmann & Sane 1999, Science, doi:10.1126/science.284.5422.1954",
+    "phi_hover_deg": 147.3,
+    "mass_mg": 0.985
+   },
+   "hand_designed": [
+    "trim: baseline amplitude solved for lift = weight",
+    "thrust -> amplitude: Phi = Phi_hover * (1 + 0.12 * thrust), max 170 deg",
+    "attitude stabiliser (PD, 10.0 Hz) acting through amplitude asymmetry (roll), mean stroke angle (pitch), drag asymmetry (yaw); stands in for halteres + steering muscles (not connectome)",
+    "pitch -> stroke-plane tilt up to 25 deg; yaw -> target yaw rate up to 400 deg/s",
+    "takeoff >= 0.5 -> escape sequence: jump impulse 6.1 g for 6 ms (elevation 70 deg) + T2 leg extension, wings start after 4 ms (all values hand-chosen)",
+    "wing joint kinematics (sinusoidal stroke + rotation flips) are for visualisation"
+   ],
+   "connectome_decides": "only the command (takeoff trigger, thrust, yaw, pitch) via flylab.bridge.rates_to_flight_command; a body that can fly is not evidence of connectome-controlled flight (G4).",
+   "not_modelled": [
+    "unsteady aerodynamics (rotational lift, wake capture, added mass)",
+    "haltere sensing",
+    "sensory feedback to the brain (open loop)",
+    "leg retraction in flight",
+    "landing"
+   ]
+  },
+  "seed": 1,
+  "metrics_flight_phase": {
+   "window_s": null
+  },
+  "behavior": "no_takeoff"
+ },
+ "brain_runtime_s": 9.697,
+ "mock": false,
+ "mock_parts": []
+}

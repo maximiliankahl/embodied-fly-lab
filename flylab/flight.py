@@ -718,8 +718,323 @@ def run_demo(duration_s: float = 1.0, render: bool = True, only: list[str] | Non
     return summary
 
 
+# ---------------------------------------------------------------- embodied flight validation (brain -> bridge -> flight body)
+BENCH_JSON = ROOT / "data" / "benchmarks" / "flight_validation.json"
+# name -> (excite groups, silenced groups, excite rate Hz, stimulus text, expected, expected source, result type, GT checks)
+# 'expected' is the flight outcome we wrote down before the final run ('takeoff' = any takeoff; 'no_takeoff').
+EMBODIED_CONDITIONS: dict[str, dict] = {
+    "control": dict(excite=[], silence=[], rate=0.0, expected="no_takeoff", source="design control (no stimulus; the model has 0 Hz baseline)",
+                    rtype="control", checks=[],
+                    stimulus="none (brain silent, nothing simulated)"),
+    "GF_bilateral": dict(excite=["GF"], silence=[], rate=150.0, expected="takeoff",
+                         source="literature: Lima & Miesenboeck 2005 (gt07), von Reyn et al. 2014 (gt24)", rtype="circular",
+                         checks=[("gt07_gf_activate_escape", "flight"), ("gt24_gf_activate_takeoff_vonreyn", "flight")],
+                         stimulus="direct 150 Hz Poisson activation of both giant fibers (DNp01), optogenetic-style"),
+    "LPLC2_10Hz": dict(excite=["LPLC2"], silence=[], rate=10.0, expected="no_takeoff",
+                       source="model prediction from the LPLC2 dose-response probe (GF activation below the 0.5 threshold); no literature ground truth",
+                       rtype="emergent_upstream", checks=[],
+                       stimulus="weak 10 Hz Poisson drive of all LPLC2 neurons (sub-threshold looming stand-in)"),
+    "LPLC2_30Hz": dict(excite=["LPLC2"], silence=[], rate=30.0, expected="takeoff",
+                       source="model prediction from the LPLC2 dose-response probe (GF activation above 0.5); no literature ground truth",
+                       rtype="emergent_upstream", checks=[],
+                       stimulus="moderate 30 Hz Poisson drive of all LPLC2 neurons (looming stand-in)"),
+    "LPLC2_bilateral": dict(excite=["LPLC2"], silence=[], rate=150.0, expected="takeoff",
+                            source="literature: Wu et al. 2016 (gt08, LPLC2 activation -> jumping) and Ache et al. 2019 (gt25, LPLC2 -> GF synapses)",
+                            rtype="emergent_upstream",
+                            checks=[("gt08_lplc2_activate_escape", "flight"), ("gt25_lplc2_gf_input_ache", "flight")],
+                            stimulus="150 Hz Poisson activation of all LPLC2 (looming-detector) neurons: upstream sensory stand-in for a "
+                                     "looming stimulus, not a rendered looming stimulus"),
+    "LPLC2_GF_silenced": dict(excite=["LPLC2"], silence=["GF"], rate=150.0, expected="no_takeoff",
+                              source="design consequence: GF is the only takeoff trigger in the adapter; no literature ground truth "
+                                     "(gt09 silences LPLC2, not GF; real flies also take off via non-GF circuits, von Reyn et al. 2014)",
+                              rtype="circular", checks=[],
+                              stimulus="150 Hz LPLC2 activation with the giant fibers silenced (outgoing synapses removed): necessity test"),
+    "DNg02_only": dict(excite=["DNg02"], silence=[], rate=150.0, expected="no_takeoff",
+                       source="design consequence: thrust acts only after a GF takeoff (Namiki et al. activated DNg02 in flying flies)",
+                       rtype="circular", checks=[],
+                       stimulus="150 Hz activation of the DNg02 population without a takeoff trigger"),
+    "GF_DNg02": dict(excite=["GF", "DNg02"], silence=[], rate=150.0, expected="takeoff",
+                     source="literature: Namiki et al. 2022 (gt26, DNg02 population -> wingbeat amplitude), Lima & Miesenboeck 2005 (gt07)",
+                     rtype="circular", checks=[("gt07_gf_activate_escape", "flight"), ("gt26_dng02_activate_wingbeat_amplitude", "amplitude")],
+                     stimulus="150 Hz activation of both giant fibers plus the DNg02 population"),
+}
+STIM_TYPE = {"control": "no stimulus (control)", "GF_bilateral": "direct DN (partly circular)",
+             "LPLC2_10Hz": "upstream (emergent via connectome)", "LPLC2_30Hz": "upstream (emergent via connectome)",
+             "LPLC2_bilateral": "upstream (emergent via connectome)",
+             "LPLC2_GF_silenced": "upstream stimulus, outcome fixed by adapter design (circular)",
+             "DNg02_only": "direct DN (partly circular)", "GF_DNg02": "direct DN (partly circular)"}
+RESULT_TYPE_TEXT = {
+    "control": "control",
+    "circular": "circular: the adapter maps this neuron population to the command using the same papers that define the ground truth "
+                "(plumbing / sign check, not a discovery)",
+    "emergent_upstream": "partly emergent: the GF rate arises from the connectome model (LPLC2 -> GF); the GF -> takeoff step is the adapter "
+                         "(circular)",
+}
+AMPLITUDE_GAIN_MIN = 1.05      # 'flight_power' observed if wing amplitude >= 1.05 x the GF-only run (design gain is +12 %)
+WALK_DRIVE_NOTE_MIN = 0.05     # walking drive above this in a no-takeoff row is reported
+VISION_CONDITIONS = ("LPLC2_bilateral", "LPLC2_GF_silenced")
+FLIGHT_SEED_CHECK = (1, 2, 3)
+
+
+def _rel(p: str | Path | None) -> str | None:
+    if not p:
+        return None
+    try:
+        return Path(p).resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        return Path(p).as_posix()
+
+
+def _downsample_traj(traj: list, dt: float = 0.05) -> list:
+    out, nxt = [], -1e9
+    for row in traj:
+        if row[0] >= nxt:
+            out.append([round(float(v), 3) for v in row])
+            nxt = row[0] + dt
+    return out
+
+
+def validate(duration_s: float = 1.0, brain_ms: float = 1000.0, n_trials: int = 3, save: bool = True, render: bool = True,
+             only: list[str] | None = None, vision: list[str] | None = None, seed: int = 0, seed_robustness: bool = True) -> dict:
+    """Brain (whole-brain LIF) -> bridge.rates_to_behavior_command -> simulate_flight, for EMBODIED_CONDITIONS.
+
+    Logs brain response, adapter output (command + explain), body physics and verification separately (G2).
+    Saves data/benchmarks/flight_validation.json (full run) + assets/flight/<condition>.mp4 + spikes/flight/out/poses_<condition>.json.
+    """
+    from flylab import atlas, brain, bridge, verify
+
+    vision = list(VISION_CONDITIONS) if vision is None else vision
+    t_all = time.perf_counter()
+    full = not only
+    video_dir = ASSET_DIR if (full and save) else OUT_DIR / "videos"
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    assert bridge.FLIGHT_TAKEOFF_THRESHOLD == 0.5, "bridge threshold must equal the flylab.flight trigger (cmd['takeoff'] >= 0.5)"
+    param_hash = bridge.FLIGHT_FROZEN["parameter_hash"]
+    assert bridge._flight_param_hash() == param_hash, "flight adapter parameters changed after freezing (G3)"
+    rows: list[dict] = []
+    for name, spec in EMBODIED_CONDITIONS.items():
+        if only and name not in only:
+            continue
+        t0 = time.perf_counter()
+        ex_ids = [i for g in spec["excite"] for i in atlas.group_ids(g)]
+        si_ids = [i for g in spec["silence"] for i in atlas.group_ids(g)]
+        if ex_ids:
+            bres = brain.simulate(ex_ids, si_ids or None, excite_rate_hz=spec["rate"], duration_ms=brain_ms, n_trials=n_trials,
+                                  seed=seed, n_threads=min(4, n_trials))
+            rates, brain_rt, n_active = bres["rates"], bres["runtime_s"], bres["n_active"]
+        else:
+            rates, brain_rt, n_active = {}, 0.0, 0
+        bc = bridge.rates_to_behavior_command(rates)
+        fc = bridge.rates_to_flight_command(rates)
+        cmd = bc["command"] if bc["mode"] == "flight" else {k: fc[k] for k in ("takeoff", "thrust", "yaw", "pitch")}
+        walk_drive = bc.get("drive")
+        rp = str(video_dir / f"{name}.mp4") if render else None
+        res = simulate_flight(cmd, duration_s=duration_s, render_path=rp, seed=seed, record_poses=True)
+        poses_path = None
+        if res.get("poses"):
+            poses_path = OUT_DIR / f"poses_{name}.json"
+            poses_path.write_text(json.dumps(res["poses"], separators=(",", ":")), encoding="utf-8")
+        took = bool(res["airborne"])
+        observed = res["behavior"]
+        # ground-truth checks (flight labels: takeoff counts as escape, see atlas.evaluate)
+        checks = []
+        for gid, kind in spec["checks"]:
+            obs = observed
+            if kind == "amplitude":
+                obs = "pending_amplitude_comparison"  # needs the GF-only run, filled in below
+            ev = atlas.evaluate(obs, gid) if kind != "amplitude" else None
+            checks.append({"gt_id": gid, "comparison": "flight body behaviour" if kind == "flight" else "wingbeat amplitude vs GF-only run",
+                           "observed": obs, **({"expected_behavior": ev["expected_behavior"], "effect": ev["effect"],
+                                                "verdict": ev["verdict"], "reason": ev["reason"]} if ev else {})})
+        # movement verification: kinematics recomputed independently; blind vision only for the key videos
+        exp_for_verify = "escape" if spec["expected"] == "takeoff" else "no_takeoff"
+        use_vis = name in vision and bool(res.get("video"))
+        ver = verify.verify_movement(res, exp_for_verify, mode="flight", use_vision=use_vis, video_path=res.get("video"))
+        vis = ver.get("vision")
+        sheet = ver.get("contact_sheet")
+        row = {
+            "condition": name, "stimulus": spec["stimulus"], "stimulus_groups": spec["excite"], "excite_rate_hz": spec["rate"],
+            "silenced_groups": spec["silence"],
+            "brain": {"n_active_neurons": n_active, "runtime_s": brain_rt, "n_trials": n_trials, "duration_ms": brain_ms,
+                      "key_group_rates_hz": {g: fc["explain"]["group_rates_hz"].get(g, 0.0) for g in bridge.FLIGHT_NEEDED_GROUPS}},
+            "adapter": {"mode": bc["mode"], "command": cmd, "walk_drive_if_not_flying": walk_drive,
+                        "mode_rule": bc["explain"].get("mode_rule"), "terms": fc["explain"]["terms"],
+                        "takeoff_activation": fc["takeoff"], "explain": fc["explain"], "frozen_hash": param_hash},
+            "body": {"behavior": observed, "airborne": took, "takeoff_time_s": res["takeoff_time_s"], "flight_time_s": res["flight_time_s"],
+                     "max_height_mm": res["max_height_mm"], "final_height_mm": res["final_height_mm"],
+                     "net_displacement_mm": res["net_displacement_mm"], "heading_change_deg": res["heading_change_deg"],
+                     "mean_speed_mm_s": res["mean_speed_mm_s"], "wing_amplitude_deg": res["wing_amplitude_deg"],
+                     "metrics_flight_phase": res["metrics_flight_phase"], "warnings": res.get("warnings"),
+                     "runtime_s": res["runtime_s"], "wall_per_sim_s": res["wall_per_sim_s"],
+                     "trajectory_downsampled": _downsample_traj(res["trajectory"])},
+            "expected": spec["expected"], "expected_source": spec["source"],
+            "as_expected": (took == (spec["expected"] == "takeoff")),
+            "result_type": spec["rtype"], "result_type_text": RESULT_TYPE_TEXT[spec["rtype"]],
+            "checks": checks, "gt_id": spec["checks"][0][0] if spec["checks"] else None,
+            "verification": {"expected_for_verifier": exp_for_verify, "final_verdict": ver["final_verdict"],
+                             "kinematic": ver["kinematic"], "vision": vis, "vision_error": ver.get("vision_error"),
+                             "agreement": ver.get("agreement"), "methods": ver.get("methods"), "reason": ver.get("reason"),
+                             "contact_sheet": _rel(sheet)},
+            "video": _rel(res.get("video")), "poses": _rel(poses_path),
+            "runtimes_s": {"brain": brain_rt, "body": res["runtime_s"], "total": round(time.perf_counter() - t0, 2)},
+        }
+        if walk_drive and max(abs(walk_drive["forward"]), abs(walk_drive["backward"]), abs(walk_drive["turn"])) > WALK_DRIVE_NOTE_MIN:
+            row["note_walk"] = ("mode is walk (no takeoff) and the walking drive is non-zero: the real body would walk; this flight run "
+                                "shows a standing fly (walking is validated separately in embodied_validation.json)")
+        # flat convenience fields (dashboards read these directly)
+        row.update({"behavior": observed, "airborne": took, "max_height_mm": res["max_height_mm"],
+                    "command": {**cmd, "explain": fc["explain"]}, "key_group_rates_hz": row["brain"]["key_group_rates_hz"],
+                    "stimulus_type": STIM_TYPE[name]})
+        rows.append(row)
+        cs = "; ".join(f"{c['gt_id']}: {c.get('verdict', 'pending')}" for c in checks)
+        print(f"{name:<18} GF {row['brain']['key_group_rates_hz']['GF_L']:6.1f}/{row['brain']['key_group_rates_hz']['GF_R']:6.1f} Hz "
+              f"cmd t={cmd['takeoff']:.2f} th={cmd['thrust']:.2f} y={cmd['yaw']:+.2f} -> {observed:<12} airborne={took!s:<5} "
+              f"hmax {res['max_height_mm']:6.1f} mm amp {res['wing_amplitude_deg']:6.1f} "
+              f"| as_expected={row['as_expected']} verify={ver['final_verdict']} | {cs} | brain {brain_rt}s body {res['runtime_s']}s", flush=True)
+    by = {r["condition"]: r for r in rows}
+    # wingbeat-amplitude check (gt26): compare with the GF-only run
+    for r in rows:
+        for c in r["checks"]:
+            if c["observed"] != "pending_amplitude_comparison":
+                continue
+            base = by.get("GF_bilateral")
+            if base is None or not r["body"]["airborne"]:
+                c.update({"observed": "not_testable", "verdict": "not_comparable", "expected_behavior": "flight_power", "effect": "induce",
+                          "reason": "needs both the GF-only and the GF+DNg02 run with takeoff"})
+                continue
+            ratio = r["body"]["wing_amplitude_deg"] / max(1e-9, base["body"]["wing_amplitude_deg"])
+            label = "flight_power" if ratio >= AMPLITUDE_GAIN_MIN else "no_flight_power"
+            ev = atlas.evaluate(label, c["gt_id"])
+            c.update({"observed": label, "amplitude_ratio_vs_GF_only": round(ratio, 3), "amplitude_threshold": AMPLITUDE_GAIN_MIN,
+                      "expected_behavior": ev["expected_behavior"], "effect": ev["effect"], "verdict": ev["verdict"],
+                      "reason": ev["reason"] + f" (amplitude {r['body']['wing_amplitude_deg']} vs {base['body']['wing_amplitude_deg']} deg, "
+                                                f"ratio {ratio:.3f}; the thrust gain is a design constant, so this is partly circular)"})
+            r["body"]["amplitude_ratio_vs_GF_only"] = round(ratio, 3)
+            r["body"]["climb_rate_mm_s"] = (r["body"]["metrics_flight_phase"] or {}).get("climb_rate_mm_s")
+    # necessity check for the GF-silenced condition
+    sil = by.get("LPLC2_GF_silenced")
+    if sil is not None:
+        ctrl = by.get("LPLC2_bilateral")
+        sil["necessity_check"] = {
+            "control_condition": "LPLC2_bilateral" if ctrl else None,
+            "control_behavior": ctrl["body"]["behavior"] if ctrl else None,
+            "silenced_behavior": sil["body"]["behavior"],
+            "informative": bool(ctrl and ctrl["body"]["airborne"]),
+            "result": ("takeoff abolished when the GF is silenced" if ctrl and ctrl["body"]["airborne"] and not sil["body"]["airborne"]
+                       else "no effect of GF silencing" if ctrl and ctrl["body"]["airborne"] else "inconclusive (control did not take off)"),
+            "caveat": "circular by design: GF is the only takeoff trigger in the adapter. Real flies also take off via non-GF "
+                      "circuits (von Reyn et al. 2014), so the real-fly prediction is a reduced probability / long-mode takeoff, not abolition."}
+    # label stability of the physics across seeds (same command, no render)
+    if seed_robustness:
+        for r in rows:
+            labs = [simulate_flight(r["adapter"]["command"], duration_s=duration_s, seed=sd)["behavior"] for sd in FLIGHT_SEED_CHECK]
+            r["body_seed_robustness"] = {"seeds": list(FLIGHT_SEED_CHECK), "labels": labs,
+                                         "fraction_same_as_main": round(sum(x == r["body"]["behavior"] for x in labs) / len(labs), 3)}
+    for r in rows:
+        r["verdict"] = r["checks"][0].get("verdict") if r["checks"] else "no_ground_truth"
+    all_checks = [c for r in rows for c in r["checks"]]
+    comparable = [c for c in all_checks if c.get("verdict") not in (None, "not_comparable", "inconclusive")]
+    n_cons = sum(c["verdict"] == "consistent" for c in comparable)
+    vis_rows = [r for r in rows if r["verification"]["vision"]]
+    out = {
+        "what": "Embodied flight validation: FlyWire v783 LIF brain -> flylab.bridge (frozen flight adapter) -> FlyBody physics (flylab.flight)",
+        "created": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "protocol": {"brain_duration_ms": brain_ms, "n_trials": n_trials, "body_duration_s": duration_s, "seed": seed,
+                     "bridge_ref_rate_hz": bridge.REF_RATE_HZ, "takeoff_threshold": bridge.FLIGHT_TAKEOFF_THRESHOLD,
+                     "amplitude_gain_min": AMPLITUDE_GAIN_MIN, "vision_conditions": vision,
+                     "adapter_version": bridge.FLIGHT_FROZEN["version"], "adapter_parameter_hash": param_hash},
+        "adapter": bridge.describe_flight(),
+        "body_model_notes": model_notes(),
+        "caveats": [
+            "G4: a body controller that can fly is not evidence of connectome-controlled flight. The connectome model decides the GF "
+            "takeoff trigger, the DNg02 wingbeat-amplitude increment and a steering asymmetry; the jump impulse, wing kinematics, "
+            "attitude stabiliser and quasi-steady aerodynamics are hand-designed (flylab.flight).",
+            "G5: open loop, constant command from 1-s time-averaged brain rates (3 trials); no sensory feedback; the upstream stimulus is a "
+            "Poisson activation of LPLC2 (looming-detector) neurons, not a rendered looming stimulus.",
+            "GF -> takeoff and DNg02 -> amplitude are adapter design terms taken from the same papers used as ground truth: those "
+            "rows are plumbing checks (circular). The partly emergent part is LPLC2 -> GF firing (and its dose dependence) from the connectome model.",
+            "GF-silenced and DNg02-only rows are consequences of the adapter design (GF is the only takeoff trigger), not findings; real flies "
+            "also take off via parallel non-GF circuits (von Reyn et al. 2014).",
+            "Single brain seed per condition; body label stability checked with 3 further physics seeds (body_seed_robustness).",
+            "Takeoff here is one label; the short (GF) vs long takeoff modes are not distinguished, and post-takeoff stability comes from "
+            "a hand-designed attitude controller. Flight yaw (walking-steering DN transfer) is not validated.",
+            "Video and poses are stroboscopic (wing beat appears slowed, 30 fps video of 200 Hz wingbeat); wing forces are cycle-averaged.",
+        ],
+        "rows": rows,
+        "summary": {
+            "n_conditions": len(rows),
+            "n_as_expected": sum(r["as_expected"] for r in rows),
+            "n_gt_checks": len(all_checks), "n_comparable": len(comparable), "n_consistent": n_cons,
+            "verdicts": {f"{r['condition']}:{c['gt_id']}": c.get("verdict") for r in rows for c in r["checks"]},
+            "verification": {r["condition"]: r["verification"]["final_verdict"] for r in rows},
+            "n_vision_checked": len(vis_rows),
+            "vision_verdicts": {r["condition"]: r["verification"]["vision"]["verdict"] for r in vis_rows},
+            "airborne": {r["condition"]: r["body"]["airborne"] for r in rows},
+            "gf_rate_hz_mean": {r["condition"]: round((r["brain"]["key_group_rates_hz"]["GF_L"] + r["brain"]["key_group_rates_hz"]["GF_R"]) / 2, 1)
+                                for r in rows},
+            "total_wall_s": round(time.perf_counter() - t_all, 1),
+        },
+    }
+    sm = out["summary"]
+    print(f"as expected {sm['n_as_expected']}/{sm['n_conditions']}; GT checks consistent {sm['n_consistent']}/{sm['n_comparable']}; "
+          f"verification {sm['verification']}; wall {sm['total_wall_s']}s")
+    if save:
+        target = BENCH_JSON if full else OUT_DIR / "flight_validation_subset.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if full and target.exists():  # keep the separately measured dose-response section (flylab.flight --dose-response)
+            try:
+                old_doc = json.loads(target.read_text(encoding="utf-8"))
+                if "lplc2_dose_response" in old_doc:
+                    out["lplc2_dose_response"] = old_doc["lplc2_dose_response"]
+            except (OSError, ValueError):
+                pass
+        target.write_text(json.dumps(out, indent=1, default=str), encoding="utf-8")
+        print(f"saved {_rel(target)}")
+    return out
+
+
+def dose_response(rates_hz: tuple = (5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150), brain_ms: float = 1000.0, n_trials: int = 3,
+                  seed: int = 0, save: bool = True) -> dict:
+    """LPLC2 stimulation rate -> GF rate -> takeoff activation (brain + bridge only, no body). Measures where the takeoff
+    threshold of the frozen adapter sits in terms of upstream drive. Merged into flight_validation.json ('lplc2_dose_response')."""
+    from flylab import atlas, brain, bridge
+
+    ids = atlas.group_ids("LPLC2")
+    rows = []
+    for hz in rates_hz:
+        res = brain.simulate(ids, None, excite_rate_hz=float(hz), duration_ms=brain_ms, n_trials=n_trials, seed=seed,
+                             n_threads=min(4, n_trials))
+        fc = bridge.rates_to_flight_command(res["rates"])
+        g = fc["explain"]["group_rates_hz"]
+        rows.append({"lplc2_rate_hz": float(hz), "gf_l_hz": g["GF_L"], "gf_r_hz": g["GF_R"], "takeoff_activation": fc["takeoff"],
+                     "takeoff_triggered": fc["explain"]["takeoff_triggered"], "n_active_neurons": res["n_active"]})
+        print(f"LPLC2 {hz:>5} Hz -> GF {g['GF_L']:6.1f}/{g['GF_R']:6.1f} Hz  takeoff {fc['takeoff']:.3f}  triggered={rows[-1]['takeoff_triggered']}", flush=True)
+    thr = None
+    for lo, hi in zip(rows, rows[1:]):
+        if lo["takeoff_activation"] < bridge.FLIGHT_TAKEOFF_THRESHOLD <= hi["takeoff_activation"]:
+            f = (bridge.FLIGHT_TAKEOFF_THRESHOLD - lo["takeoff_activation"]) / (hi["takeoff_activation"] - lo["takeoff_activation"])
+            thr = round(lo["lplc2_rate_hz"] + f * (hi["lplc2_rate_hz"] - lo["lplc2_rate_hz"]), 1)
+            break
+    out = {"what": "LPLC2 Poisson drive -> GF firing -> takeoff activation of the frozen flight adapter (brain + bridge, no body)",
+           "protocol": {"brain_duration_ms": brain_ms, "n_trials": n_trials, "seed": seed, "target": "all LPLC2 neurons",
+                        "takeoff_threshold": bridge.FLIGHT_TAKEOFF_THRESHOLD},
+           "rows": rows, "takeoff_threshold_lplc2_rate_hz_interpolated": thr,
+           "note": "GF firing is graded (not all-or-none) in the LIF model; the takeoff threshold of the adapter (half the reference rate) "
+                   "is hand-chosen. Poisson rates are a stand-in for looming strength, not a calibrated stimulus."}
+    if save and BENCH_JSON.exists():
+        doc = json.loads(BENCH_JSON.read_text(encoding="utf-8"))
+        doc["lplc2_dose_response"] = out
+        BENCH_JSON.write_text(json.dumps(doc, indent=1, default=str), encoding="utf-8")
+        print(f"merged into {_rel(BENCH_JSON)}")
+    return out
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description="FlyBody flight (quasi-steady aerodynamics) driven by a 4-number command")
+    ap.add_argument("--dose-response", action="store_true", help="LPLC2 rate -> GF -> takeoff (merged into flight_validation.json)")
+    ap.add_argument("--validate", action="store_true", help="brain -> bridge -> flight validation (flight_validation.json)")
+    ap.add_argument("--no-vision", action="store_true")
+    ap.add_argument("--no-save", action="store_true")
     ap.add_argument("--demo", action="store_true")
     ap.add_argument("--only", nargs="*", default=None)
     ap.add_argument("--command", type=str, default=None, help='e.g. "takeoff=1,thrust=0.5,yaw=-0.5"')
@@ -732,7 +1047,12 @@ def main(argv: list[str] | None = None) -> None:
         sys.stdout.reconfigure(encoding="utf-8")
     if args.rebuild and MODEL_CACHE.exists():
         MODEL_CACHE.unlink()
-    if args.demo:
+    if args.dose_response:
+        dose_response(save=not args.no_save)
+    elif args.validate:
+        validate(duration_s=args.duration, render=not args.no_render, only=args.only, save=not args.no_save,
+                 vision=[] if args.no_vision else None)
+    elif args.demo:
         run_demo(duration_s=args.duration, render=not args.no_render, only=args.only)
     elif args.command:
         cmd = {k.strip(): float(v) for k, v in (p.split("=") for p in args.command.split(",") if "=" in p)}

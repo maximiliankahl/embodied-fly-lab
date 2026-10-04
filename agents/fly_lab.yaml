@@ -86,9 +86,11 @@ prompt: |
      choice (cost vs information), results vs literature (verdicts), movement-verifier verdicts
      (kinematic vs vision), surprises and what changed in the plan, measured numbers (Hz, mm, runtimes,
      parallel speed-up), limitations, next experiments.
-  Flight questions (escape, takeoff, flying): the walking body cannot take off - the planner should use
-  run_embodied_flight (expected behaviour "escape" = takeoff) if the tool result is not mock; if it returns
-  "mock": true, say that the flight body was MOCK and treat flight results as pipeline checks only.
+  Flight questions (escape, takeoff, flying): the walking body cannot take off. In EVERY cycle the embodied runs
+  must be FLIGHT runs (run_embodied_flight = spec kind "embodied_flight"; expected behaviour "escape" = takeoff, a
+  GF-silenced run is expected to give "no_takeoff"). Begin each dispatch to planner, safety and runner with
+  "FLIGHT question: embodied runs = embodied_flight (run_embodied_flight), NEVER run_embodied_experiment (walking)."
+  If a tool result says "mock": true, say that the flight body was MOCK and treat it as a pipeline check only.
 
   Scientific rules: never invent neuron ids, cell types, DOIs or results; only cite DOIs returned
   by tools. Preserve uncertainty (n_trials, gt_confidence, mock flags, verifier verdicts). Keep evidence
@@ -209,11 +211,18 @@ tools:
         E3 (optional) embodied runs per candidate (kind="embodied" each).
       Add ONE embodied run (duration_s=1.0; run_embodied_experiment for walking, run_embodied_flight for escape/takeoff)
       of the best literature-backed hit to show the behavioural consequence - the movement verifier checks it.
+      FLIGHT (escape / takeoff / giant fiber) questions: every embodied option has kind "embodied_flight" (price it with
+      estimate_cost(kind="embodied_flight", duration_ms=1000, n_trials=3, duration_s=1.0)); kind "embodied" = WALKING body
+      cannot take off and is INVALID there. In the chosen run list give each run as an exact spec, e.g.
+      {"kind": "embodied_flight", "excite_groups": ["LPLC2"], "silence_groups": ["GF"], "seed": 1} + its expected body
+      behaviour (GF silenced: no_takeoff; control without silencing: escape) + the ground-truth id it tests. State in
+      "why" that the adapter wires takeoff to GF, so "GF silenced -> no takeoff" is true by design (adapter check,
+      not a discovery); the informative part is the brain-level GF rate and the dose-dependence.
       For a necessity cycle compare e.g. a brain-only silencing run vs. an embodied silencing run (+ control without
       silencing). Manipulation and control are INDEPENDENT -> mark them for run_experiments_parallel (one call, max 6
       specs, e.g. [{"kind": "brain", "excite_groups": ["LC16"], "silence_groups": ["MDN"], "seed": 1},
       {"kind": "brain", "excite_groups": ["LC16"], "seed": 1}]). Replicates need different seeds.
-      Score expected information gain (high/medium/low or 0-1) with one sentence why. Check get_benchmark() for a
+      Keep it brief: 2-3 options, one sentence of "why" each. Score expected information gain (high/medium/low or 0-1) with one sentence why. Check get_benchmark() for a
       measured screen benchmark (e.g. screen_MDN) and cite its numbers if it exists. Note: in our bridge the backward
       drive is read ONLY from MDN, so an embodied run with MDN silenced cannot walk backward by construction - the
       informative necessity readout is the brain-level descending rates. Record with
@@ -241,6 +250,9 @@ tools:
       Review: total estimated cost vs. the 10-unit budget, embodied runs (hard cap 6 per research run, flight runs
       included), screen size (<= 40 candidates per call), parallel batches (<= 6 specs), unrealistic parameters
       (rate_hz > 300, duration_ms > 5000, n_trials > 10, duration_s > 3 or < 1), and claims beyond the evidence.
+      The action text must keep the exact spec kind of every run ("embodied_flight" = flying body, "embodied" =
+      walking body). For a FLIGHT (escape/takeoff) question a plan with a walking-body ("embodied") run is wrong:
+      answer CHANGES-REQUESTED and name embodied_flight instead.
       If acceptable, call request_approval(action=<exact run list>, reason=<expected information gain>,
       est_cost=<units>) exactly once. The Omnigent policy turns this into a HUMAN approval (or a
       pre-approval given at launch for scripted runs - the tool result says which). If denied, report
@@ -270,6 +282,9 @@ tools:
       no brain: a control), run_experiments_parallel (several INDEPENDENT specs in ONE call, e.g. manipulation + control
       or seed replicates: [{"kind": "brain"|"embodied"|"embodied_flight"|"flight"|"screen", ...tool args}]).
       If the plan marks runs as independent, use ONE run_experiments_parallel call for them.
+      Run the tool/kind the spec names, exactly: kind "embodied_flight" -> run_embodied_flight (flying body); NEVER swap
+      in run_embodied_experiment (walking) for an escape / takeoff / flight spec - if a spec just says "embodied" on a
+      flight question, use embodied_flight.
       Cell types (e.g. LC16, LC9) and atlas groups (e.g. MDN, P9, GF) can be used as group names.
       Replicates need DIFFERENT seed values: the same seed + parameters gives an identical result.
       If a tool returns ok=false, report the error verbatim; retry at most once (never retry an expensive run).
@@ -315,6 +330,8 @@ tools:
       For EVERY embodied/flight artifact you are given call verify_movement(experiment_ref=<artifact>, and the expected
       behaviour via hypothesis_id=... or ground_truth_id=... (preferred, so the source is recorded) or
       expected_behavior=...). If several are independent, call verify_movement for all of them IN THE SAME TURN.
+      Use the FULL ground-truth id from the input (e.g. gt08_lplc2_activate_escape). For a flight run with GF (or
+      another takeoff route) silenced pass expected_behavior="no_takeoff"; for its control without silencing "escape".
       If no expected behaviour was given, read get_record(last_n=40) to find the hypothesis that the run tests.
       The tool runs two INDEPENDENT checks: kinematics recomputed from the raw trajectory (own formulas and thresholds,
       not the body classifier) and a BLIND vision check of a keyframe contact sheet (the vision model never sees the
@@ -344,9 +361,15 @@ tools:
       For each result: find matching ground-truth entries (list_ground_truth: SAME manipulation of the SAME
       target group that the run actually manipulated - e.g. an LC16 run is NOT a test of "activate MDN")
       and call compare_to_ground_truth(observed_behavior, ground_truth_id, experiment_ref, control_behavior).
+      Call it ONLY for entries that run really tests (at most 4 calls per cycle, in parallel in one turn); do not
+      compare entries whose manipulation/target was not run - name them in one line as "not tested here".
       experiment_ref MUST name the artifact file(s), e.g. "embodied_01.json" or "screen_01.json (LC16 row)":
       the tool loads them, marks manipulation mismatches inconclusive, records where the label came from AND attaches
       the movement-verifier verdicts (movement_verified).
+      Flight run: observed_behavior = the flight label of the artifact (no_takeoff, hover, climb, forward_flight,
+      flight_turn_left/right); any takeoff label counts as escape, no_takeoff as no escape; for silencing entries pass the
+      control run's flight label as control_behavior. Takeoff is wired to GF in the (frozen) adapter, so GF-linked
+      agreement and "GF silenced -> no_takeoff" are adapter checks (circular by design), not discoveries.
       Embodied run: observed_behavior = the BODY CLASSIFIER label ("behavior"). Use the MOVEMENT VERIFIER verdict:
       only final_verdict "correct" lets you count the body movement as observed; "uncertain" -> report the
       behavioural match as UNVERIFIED (weak or disputed movement); "incorrect" -> the body did not perform it.

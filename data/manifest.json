@@ -1,0 +1,553 @@
+{
+  "schema_version": 1,
+  "project": "Embodied Fly Lab (Hack-Nation 7, Challenge 03)",
+  "generated_at_utc": "2026-10-04T07:50:37+00:00",
+  "generated_by": "spikes/audit/make_manifest.py (SHA256 and sizes computed from the local files; nothing here is downloaded)",
+  "policy": "data/raw/ is gitignored and never committed. Re-download with the URLs below (flylab.brain / flylab.atlas do it on first use, flygym lazily) and verify with --verify.",
+  "verify": "uv run python spikes/audit/make_manifest.py --verify",
+  "idea_credit": "manifest structure follows JonasMayerDev/FlyBrainLab data/brain/manifest.json; its Shiu-file hashes equal ours (cross-checked), and its Zenodo metadata is the source of the connectome licence below",
+  "datasets": [
+    {
+      "id": "flywire_v783_connectivity_shiu",
+      "title": "FlyWire v783 model-ready connectivity and neuron list, as packaged by the Shiu et al. 2024 repository",
+      "used_for": "whole-brain LIF model (flylab/brain.py): 138,639 neurons, 15.1 M connections",
+      "source_repository": "https://github.com/philshiu/Drosophila_brain_model",
+      "source_commit": "91bdd1e7dcf193f3e7ca5a8933497fcef63b7960",
+      "source_commit_note": "commit taken from the teammate manifest (JonasMayerDev/FlyBrainLab). The SHA256 of all 7 files below equal that manifest, so our copies are byte-identical to that commit. flylab.brain downloads from branch main, which may move.",
+      "version": "FlyWire FAFB materialization 783",
+      "underlying_connectome": {
+        "doi": "10.5281/zenodo.10676866",
+        "url": "https://zenodo.org/records/10676866",
+        "version": "783.0",
+        "license": "CC-BY-4.0 (Zenodo record 'rights' field, as stored in the teammate repo data/brain/flywire783/zenodo_metadata.json)",
+        "attribution": "FlyWire Consortium; Dorkenwald et al. 2024 (doi:10.1038/s41586-024-07558-y); Schlegel et al. 2024 (doi:10.1038/s41586-024-07686-5)"
+      },
+      "code_license": "MIT (data/raw/LICENSE, Copyright 2023 Philip Shiu and Nico Spiller)",
+      "paper": "Shiu et al. 2024, Nature, doi:10.1038/s41586-024-07763-9",
+      "limitations": [
+        "model-ready transformed tables from the Shiu repository, not the raw synapse archive",
+        "brain only: FlyWire v783 has no ventral nerve cord, so the descending-to-body bridge is hand-designed"
+      ],
+      "files": [
+        {
+          "path": "data/raw/Connectivity_783.parquet",
+          "bytes": 100804642,
+          "sha256": "efeb23fb99098e9c390f6869969b2a121a2ee92c833cfc45ecb2c1d8e1af0347",
+          "url": "https://raw.githubusercontent.com/philshiu/Drosophila_brain_model/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960/Connectivity_783.parquet",
+          "note": "model-ready connectivity (neuron pairs, synapse counts, signs)"
+        },
+        {
+          "path": "data/raw/Completeness_783.csv",
+          "bytes": 3327347,
+          "sha256": "bbb847a4cc2caaa7a16349722d220c087317b946d148d4d592d94d250617a311",
+          "url": "https://raw.githubusercontent.com/philshiu/Drosophila_brain_model/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960/Completeness_783.csv",
+          "note": "neuron list (root IDs) of the model, 138,639 neurons"
+        },
+        {
+          "path": "data/raw/LICENSE",
+          "bytes": 1085,
+          "sha256": "3621f6d6476189190e2960fa43f11b275ba4eca848fdac50a1ba2925de6223e8",
+          "url": "https://raw.githubusercontent.com/philshiu/Drosophila_brain_model/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960/LICENSE",
+          "note": "MIT licence of the Shiu et al. code repository"
+        },
+        {
+          "path": "data/raw/Readme.md",
+          "bytes": 3617,
+          "sha256": "0654ac53f9af85000b50f6a5d2297aade8602c507a44e811f8aff602629c2625",
+          "url": "https://raw.githubusercontent.com/philshiu/Drosophila_brain_model/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960/Readme.md"
+        },
+        {
+          "path": "data/raw/model.py",
+          "bytes": 11900,
+          "sha256": "fc45837d7122c6ce2a7f3f2f23c515992e4b232aadb919efabb72337fac88e4e",
+          "url": "https://raw.githubusercontent.com/philshiu/Drosophila_brain_model/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960/model.py",
+          "note": "reference Brian2 implementation (used only for the cross-check)"
+        },
+        {
+          "path": "data/raw/utils.py",
+          "bytes": 2176,
+          "sha256": "f378cf0b464f2ac5e1daf3609ba25fd51c7e34f294846281707ffe006c3e9ef1",
+          "url": "https://raw.githubusercontent.com/philshiu/Drosophila_brain_model/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960/utils.py"
+        },
+        {
+          "path": "data/raw/example.ipynb",
+          "bytes": 10282,
+          "sha256": "1737c3043af700504c4791c4bfc02d1856bbeb0d36c469832e4b9399dfddda3a",
+          "url": "https://raw.githubusercontent.com/philshiu/Drosophila_brain_model/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960/example.ipynb"
+        },
+        {
+          "path": "data/raw/figures.ipynb",
+          "bytes": 33229,
+          "sha256": "33cd73c0b4b4a291c51b7bab639c4fa28978e49e111ff0d6adbca5687addb84c",
+          "url": "https://raw.githubusercontent.com/philshiu/Drosophila_brain_model/main/figures.ipynb",
+          "note": "branch main (not commit-pinned); source of the Shiu sugar/bitter/water/JO neuron ID sets used in the atlas"
+        },
+        {
+          "path": "data/raw/sez_neurons.pickle",
+          "bytes": 5114,
+          "sha256": "2bc5a2a8289924f2de39a8e68bdc07025cb6d6c6c6ddc83a973c0cace7cec2ce",
+          "note": "downloaded together with the Shiu files (file time 2026-10-03 22:56); the download source is not recorded in the flylab code and no flylab module reads it, so its origin is NOT VERIFIED here"
+        }
+      ]
+    },
+    {
+      "id": "flywire_v783_connectivity_derived_csr",
+      "title": "Sparse CSR cache of the connectivity (derived locally by flylab.brain, not an upstream file)",
+      "used_for": "fast event-driven simulation",
+      "files": [
+        {
+          "path": "data/raw/brain_csr_v783.npz",
+          "bytes": 92771118,
+          "sha256": "ec3d1bd9518c1ef9e063c3bc9132db1912d4ba86138d8e377cd27ba849930f21",
+          "note": "built by flylab.brain from Connectivity_783.parquet; hash is of OUR build (depends on numpy/scipy versions), informative only; delete to rebuild"
+        }
+      ]
+    },
+    {
+      "id": "flywire_v783_annotations",
+      "title": "FlyWire neuron annotations (cell types, classes, soma side, neurotransmitter) for root IDs of release 783",
+      "used_for": "atlas (flylab/atlas.py: 63 curated groups, candidate cell types for the screen), brain-point positions of the 3D viewer",
+      "source_repository": "https://github.com/flyconnectome/flywire_annotations",
+      "url": "https://raw.githubusercontent.com/flyconnectome/flywire_annotations/main/supplemental_files/Supplemental_file1_neuron_annotations.tsv",
+      "url_note": "branch main (not commit-pinned); copy of flylab.atlas.ANNOT_URL. The upstream README says the content may have been updated and extended with Berg et al. 2025 relative to Schlegel et al. 2024.",
+      "version": "root_id column = FlyWire release 783",
+      "citations": [
+        "10.1038/s41586-024-07686-5",
+        "10.1038/s41586-024-07558-y",
+        "10.1038/s41586-025-08925-z"
+      ],
+      "license": "NOT VERIFIED here. Cite the three papers and see the upstream repository before redistributing; the file is gitignored and not redistributed by this repo.",
+      "files": [
+        {
+          "path": "data/raw/flywire_annotations_Supplemental_file1_neuron_annotations.tsv",
+          "bytes": 31720298,
+          "sha256": "b214970b55d2fbe0853bba536fdcb9e28730f4eb7ab06f600491df795da683cd"
+        },
+        {
+          "path": "data/raw/flywire_annotations_README.md",
+          "bytes": 7525,
+          "sha256": "49e884a1273105427ded3c110d48266702a3f90148006cf02c1a0fa50919eb71"
+        }
+      ]
+    },
+    {
+      "id": "flygym_flybody_meshes",
+      "title": "FlyBody full-size meshes (.obj) fetched lazily by flygym 2.1 for the flight body (flylab/flight.py)",
+      "used_for": "physics flight body (MuJoCo) and the 3D viewer geometry",
+      "source": "https://datasets.epfl.ch/nely-public-share/flygym_assets/flybody_fullsize_meshes_20260623a/<file>",
+      "source_note": "public S3-compatible bucket 'nely-public-share', key prefix 'flygym_assets/flybody_fullsize_meshes_20260623a' (constants in flygym/utils/assets_lazy_loading.py and flygym/compose/fly/flybody.py)",
+      "version": "mesh set 20260623a, flygym 2.1.0",
+      "model_papers": [
+        "FlyBody: Vaxenburg et al. 2025, Nature, doi:10.1038/s41586-025-09029-4",
+        "NeuroMechFly v2: Wang-Chen et al. 2024, Nature Methods, doi:10.1038/s41592-024-02497-y"
+      ],
+      "license": "flygym package: Apache-2.0 (package metadata). Licence of the mesh files themselves NOT VERIFIED here; the original FlyBody model is at https://github.com/TuragaLab/flybody.",
+      "n_files": 87,
+      "total_bytes": 140210791,
+      "tree_sha256": "3e4d3b0ab221df25813abbaf66d48267e8dbef5ba01ae544dee8d6cb61d2ebab",
+      "tree_sha256_definition": "sha256 of the lines '<relative file name> <file sha256>' (sorted by name, joined by LF)",
+      "files": {
+        "c_abdomen1_body.obj": {
+          "bytes": 787312,
+          "sha256": "b2abf8b9b30827e7d9c685a71e1f9a75c6141cf91a62fff925ce5d4e2265d77f"
+        },
+        "c_abdomen1_lower.obj": {
+          "bytes": 257805,
+          "sha256": "6ef6434b53b205a11afa6a7ddf308a82271f2b37eda2a0294e9002d4c9b1480d"
+        },
+        "c_abdomen2_body.obj": {
+          "bytes": 331650,
+          "sha256": "36f8551badf82699818f53f941eb3600b2d79b35f149f7e65b533942a31a6370"
+        },
+        "c_abdomen2_lower.obj": {
+          "bytes": 274657,
+          "sha256": "669ecb6d178583084119c77928806b688080d5e1e674f634407819335f06c2af"
+        },
+        "c_abdomen3_body.obj": {
+          "bytes": 398902,
+          "sha256": "4b1f96ca00c052c616ade8ddba493698a603169d7c23fba2045cd5fe087d2368"
+        },
+        "c_abdomen3_lower.obj": {
+          "bytes": 324270,
+          "sha256": "8d673599ab4fe00e29520f4a9645bb71aac13395c596ed6efdff756673c92d3d"
+        },
+        "c_abdomen4_body.obj": {
+          "bytes": 397790,
+          "sha256": "4e4d7303cb9ee3b50bccf760372991de11b38c36745f2f48a1ca6bf68d2721e4"
+        },
+        "c_abdomen4_lower.obj": {
+          "bytes": 323970,
+          "sha256": "1564d59e1e0da9e5c6aba3f641dff3b4be20a50a67bcedcab32e0ca17380a0b9"
+        },
+        "c_abdomen5_body.obj": {
+          "bytes": 388232,
+          "sha256": "a6e44333d3af208b4048ce607ff844616a96edb4b393cecc7078374f71888de0"
+        },
+        "c_abdomen5_lower.obj": {
+          "bytes": 349771,
+          "sha256": "166b42d02c2b134814ceec44651fed6c2a371e9deb90c6df5c970bf38a874419"
+        },
+        "c_abdomen6_body.obj": {
+          "bytes": 397553,
+          "sha256": "47a1634715d18bbe774db0f67b41a5fca5a586ec5ac0d9e1e3bb7ffd734c4565"
+        },
+        "c_abdomen6_lower.obj": {
+          "bytes": 323874,
+          "sha256": "9abd1b7fefefbb500cf8fcb9f0d03366929d681c9381b3da0f8a0160cbc91415"
+        },
+        "c_abdomen7_body.obj": {
+          "bytes": 397608,
+          "sha256": "d11f701e20cfb2481fe9afead4f3dc0fc9cd4571529f287847c70509a31762bd"
+        },
+        "c_abdomen7_lower.obj": {
+          "bytes": 323778,
+          "sha256": "70d46067d1a7ad757fcb8487c6830ef6fa98de7b6549d5ae6675b33380021de6"
+        },
+        "c_abdomen8_body.obj": {
+          "bytes": 902381,
+          "sha256": "6ca5cd83a307f066db7b9ac1c976ad0526b87ada9f630e67356682a962386408"
+        },
+        "c_haustellum_black.obj": {
+          "bytes": 1324760,
+          "sha256": "ba122d45bfbc09dc18bfab42f8fda8d5056e05ee719e199c5a32b8aa6bd8fe6c"
+        },
+        "c_haustellum_body.obj": {
+          "bytes": 1869810,
+          "sha256": "33a7c2f675418396461b1b21a4e1d2471a4a3b9ead58eb58cfe1c0863f24cfee"
+        },
+        "c_head_black.obj": {
+          "bytes": 12364825,
+          "sha256": "3ee34824c8d9427bf6b55a68aa655ce9ac767ef083ca224740ca8c34f2722f3a"
+        },
+        "c_head_body.obj": {
+          "bytes": 6161382,
+          "sha256": "d11ad6a8e1956251e1326118a88323909833022f7a99c17e5b6534f3b06fc0f6"
+        },
+        "c_head_ocelli.obj": {
+          "bytes": 6158153,
+          "sha256": "848e452df8102c3d8efe0774d7653678ac26e1ca158b43db0a1c6451226f9870"
+        },
+        "c_head_red.obj": {
+          "bytes": 31095839,
+          "sha256": "d5e71663e2e94d16cb0941ebc86717ac67b6758fbec5c34be6fa6e221dbdc649"
+        },
+        "c_rostrum_body.obj": {
+          "bytes": 2118298,
+          "sha256": "fee573751b7287681fbf8feb752b4c8b94860cf39fb66cd970740385f7c8e52b"
+        },
+        "c_rostrum_bristle-brown.obj": {
+          "bytes": 1549365,
+          "sha256": "87da480fa50150977f1058725b87d91faf8e38441ed6508be8fe9803f88f7413"
+        },
+        "c_thorax_black.obj": {
+          "bytes": 12653964,
+          "sha256": "99e5244ef12728410550ce9db87c0955fad4203de9a3385c9a47686abc49a05c"
+        },
+        "c_thorax_body.obj": {
+          "bytes": 9431470,
+          "sha256": "ca9b148939cb1eee4c9545a745ca8a91ca6ca7c92086ffdc1fcb3d8d0f6853d3"
+        },
+        "l_antenna_black.obj": {
+          "bytes": 853134,
+          "sha256": "685ef74b39ef6c8374f1ed49f3f845fbe66e169cbb572d2958809b6223a8b6e2"
+        },
+        "l_antenna_body.obj": {
+          "bytes": 2058111,
+          "sha256": "39105bc670a8a39e03c15a67fb441b833daa00cf5ed6d55d30dbcd3043b3120c"
+        },
+        "l_haltere_body.obj": {
+          "bytes": 653095,
+          "sha256": "728aa62e18e089692c39dae8d45bda45680bd8c6ce2c6c6aef6abb282b9691fc"
+        },
+        "l_labrum_lower.obj": {
+          "bytes": 501599,
+          "sha256": "f74a0c1ebbc87f331c1489696f91ef2a30e759491bfa89fb75d2ae805a92faef"
+        },
+        "l_wing_brown.obj": {
+          "bytes": 2824706,
+          "sha256": "27ec3ae2ea4adb8ade08f34c8da90057cf9913047aa0662e85ab4ba353a30771"
+        },
+        "l_wing_membrane.obj": {
+          "bytes": 221433,
+          "sha256": "b88bf2167a5ddadedd963114cb0f367e1b89c5cdb99f7325875235c46fd4b9b2"
+        },
+        "lf_coxa_body.obj": {
+          "bytes": 1105100,
+          "sha256": "30c1ff292e34e2b20421f023976f132d5eac26d01216bd8fd97e289d89aa1b75"
+        },
+        "lf_tarsus1_body.obj": {
+          "bytes": 345465,
+          "sha256": "0ca608bb4de12a51b7e69b92244f3ccc1c37ca562fedf1a6a1ad48c3c3c62013"
+        },
+        "lf_tarsus2_body.obj": {
+          "bytes": 312982,
+          "sha256": "84d42548a63c20cc83ab751e605633b710af4bae04c29d32e9d851a1c67e889f"
+        },
+        "lf_tarsus3_body.obj": {
+          "bytes": 313430,
+          "sha256": "98b9fb8059491b075d832cbc593df9b12d12e1ccffca350001c679146ce0dc4b"
+        },
+        "lf_tarsus4_body.obj": {
+          "bytes": 314245,
+          "sha256": "c7ccf8d3f3258aeb8eb33935f8f1d766a344b591490094abace8ee283425ac78"
+        },
+        "lf_tarsus5_brown.obj": {
+          "bytes": 798635,
+          "sha256": "ea38ac4fbee2184ad0a4f35fd542df5ded7e6dd6ff1c344b02438ddc506b2ae0"
+        },
+        "lf_tibia_body.obj": {
+          "bytes": 516940,
+          "sha256": "8df1760f6d1577db63c22a44224660349ce488d788b96c4caa8226d8ce976855"
+        },
+        "lf_trochanterfemur_body.obj": {
+          "bytes": 1154869,
+          "sha256": "88dd01b942a309e85329dc968862d6d6bb3db4ff08a5ec3ab0be7579841b9561"
+        },
+        "lh_coxa_body.obj": {
+          "bytes": 865841,
+          "sha256": "ccfd14f407ab665047251f1b88010b96c997797e05c4e1bf51dec125ed2a0e03"
+        },
+        "lh_tarsus1_body.obj": {
+          "bytes": 831974,
+          "sha256": "50e42d7f3aba2a42313a7804ae5dd8f9d2b52006fb449bd92df3088e8d9f0d24"
+        },
+        "lh_tarsus2_body.obj": {
+          "bytes": 478593,
+          "sha256": "a6e504636518cd984acaad4254ea7e967cfb2ec60522cd6c32856829db5e271f"
+        },
+        "lh_tarsus3_body.obj": {
+          "bytes": 344280,
+          "sha256": "fd367fbdbf7133da991fe9cfb2f9b48437bb2aa3c475eac1b1fa214020c3117f"
+        },
+        "lh_tarsus4_body.obj": {
+          "bytes": 350442,
+          "sha256": "f60138bef74a9bc35aeaec3df67872dbda7f990c52bd5702bf901ae874dee751"
+        },
+        "lh_tarsus5_brown.obj": {
+          "bytes": 910050,
+          "sha256": "2d44246c00c36d6320f7add8552fa0a7bd6e55bf9250a1f5792d4c3125278ed2"
+        },
+        "lh_tibia_body.obj": {
+          "bytes": 1180232,
+          "sha256": "0c8ec3402ef0701f37964a1322bd732ae9e70170b5979c5e55baf63429dd704f"
+        },
+        "lh_trochanterfemur_body.obj": {
+          "bytes": 1652601,
+          "sha256": "6f808fdd62673962a4f32cfa37f893e277bd22c91f42592670115d58d3784c73"
+        },
+        "lm_coxa_body.obj": {
+          "bytes": 1250039,
+          "sha256": "51e7c30d788783c79bde8ba7afdc2c14040ce66fb6bb08d45e784273ea0c3937"
+        },
+        "lm_tarsus1_body.obj": {
+          "bytes": 592366,
+          "sha256": "b73af79b7b16daeefa003d02cbd249e305e5e305bfd365ea495b5da959b5bf47"
+        },
+        "lm_tarsus2_body.obj": {
+          "bytes": 416307,
+          "sha256": "b83c5ff6d9d0c376a0c57638ff456bb13bce7779558a19b59fc33544c485b76a"
+        },
+        "lm_tarsus3_body.obj": {
+          "bytes": 347736,
+          "sha256": "6aeb61bf2f0c566a22a340dcbb533c6018703cfce0fe81431abf6b2c93134832"
+        },
+        "lm_tarsus4_body.obj": {
+          "bytes": 315831,
+          "sha256": "03f2121ae2419672a5cc764a430b88c0d94f31b3a152a7764ecdec4ecbc1f41c"
+        },
+        "lm_tarsus5_brown.obj": {
+          "bytes": 842537,
+          "sha256": "603c6a11072643b366535a3ed1b831735cdb128df25fd3467b20440a96f296d3"
+        },
+        "lm_tibia_body.obj": {
+          "bytes": 660368,
+          "sha256": "5d31bc233c9efc7fbd51f34bbff10d9b3dca819fd27d89e19f96613bdda3da40"
+        },
+        "lm_trochanterfemur_body.obj": {
+          "bytes": 1614762,
+          "sha256": "fae05c5dde22b6ade379196659e39908f6f6dfae37e1f734f89daa7291fbad6e"
+        },
+        "metadata.yaml": {
+          "bytes": 333,
+          "sha256": "4550d047d80b5ec1b6d10005a503a3d667fc78ef454ce3957b5b09c33380bddd"
+        },
+        "r_antenna_black.obj": {
+          "bytes": 848016,
+          "sha256": "528b092ffa5c27670408172d79752d5a63f74812a7210ce59cbf6e1214ab3f67"
+        },
+        "r_antenna_body.obj": {
+          "bytes": 2045592,
+          "sha256": "d70e06616ac82bd64573073f92bf4b6ed838865a1041ddea4b2cdf8e1d9194c8"
+        },
+        "r_haltere_body.obj": {
+          "bytes": 649901,
+          "sha256": "a7d7ab9b1462f5295e5212ff3f30ccee2c96fed1836319cebe095b0c71af0941"
+        },
+        "r_labrum_lower.obj": {
+          "bytes": 515939,
+          "sha256": "52b9580c79ba48c6a76c8d749d26dd5128e605b65c4f4a7e6e48d93b8ef565c8"
+        },
+        "r_wing_brown.obj": {
+          "bytes": 2805048,
+          "sha256": "27cd3b9a608b8b17f3a63d4aba774806d55deda8750edf08c8f86e2a79dad64d"
+        },
+        "r_wing_membrane.obj": {
+          "bytes": 219913,
+          "sha256": "b4df8b8c4331dfa2ca2078ac852188809142935c766c547c17d213e867fa8ead"
+        },
+        "README": {
+          "bytes": 440,
+          "sha256": "3a62d6ce8b76b0d9e216fea887e7892cdf300e384d318af5c2019d3cf1c9bbe1"
+        },
+        "rf_coxa_body.obj": {
+          "bytes": 1102424,
+          "sha256": "4b63ad8ed672c08b1ec6faeb27b0b693af4c96b808a8892285aa86e58469c592"
+        },
+        "rf_tarsus1_body.obj": {
+          "bytes": 349162,
+          "sha256": "ed1020232748ec3741157af4a9d49a4ee1073f2818a37c4d097ae9a99f3dd1dc"
+        },
+        "rf_tarsus2_body.obj": {
+          "bytes": 316628,
+          "sha256": "e17d74c8c4ea3bb2f4142855f6b90c263e327141dde64941b0d6bb128874d002"
+        },
+        "rf_tarsus3_body.obj": {
+          "bytes": 317108,
+          "sha256": "9be16f63f33ffb1a2f693236fbb80178b90a4b21ba3b3d1d0898edf5a5ec8f75"
+        },
+        "rf_tarsus4_body.obj": {
+          "bytes": 318044,
+          "sha256": "04d252037202891d2ecd7b786165afc79820e4da2f0d3dd7a1a50720dfea3893"
+        },
+        "rf_tarsus5_brown.obj": {
+          "bytes": 822582,
+          "sha256": "62af3faf65ebd70ab8bcdba2b2c34bef402cce056dc0fbdbbacac4a4c1a88c44"
+        },
+        "rf_tibia_body.obj": {
+          "bytes": 515517,
+          "sha256": "320c29dbddb1eb8610282dc72df5e4208d9cb241c282b709daf400e4ce7c12a8"
+        },
+        "rf_trochanterfemur_body.obj": {
+          "bytes": 1140432,
+          "sha256": "45d3a2175bfd449058bfef74efd4e0eeba785c3bf2ce2979f4598a388aeb1c4a"
+        },
+        "rh_coxa_body.obj": {
+          "bytes": 859909,
+          "sha256": "013557a9fda80ee50dd530cf90fa42a3840c620b5b884c690a1f6eb6bafd1a86"
+        },
+        "rh_tarsus1_body.obj": {
+          "bytes": 846729,
+          "sha256": "eff29a60c5f741e339d2dea5ac27143fb1009ecb7d3a7bd07b35d1804ab7e65a"
+        },
+        "rh_tarsus2_body.obj": {
+          "bytes": 486458,
+          "sha256": "01ca78ac975d9371470a78402c901434d92d2e200f6fb4685a1228ad3462723f"
+        },
+        "rh_tarsus3_body.obj": {
+          "bytes": 348822,
+          "sha256": "59e9c489621f2f225d256fac116945282b3b6994980b3c042ef662e879585a32"
+        },
+        "rh_tarsus4_body.obj": {
+          "bytes": 350447,
+          "sha256": "a2d849312ecb9ed9d5bd1ab6a8bfd5f3fa25db016abaf3339968dc79463fe1cd"
+        },
+        "rh_tarsus5_brown.obj": {
+          "bytes": 947595,
+          "sha256": "aec466c50c5f52943c6d72416e4af323a92d778a25c621cec48214c70e089f4b"
+        },
+        "rh_tibia_body.obj": {
+          "bytes": 1140937,
+          "sha256": "55dd96ec2e882fe4255c2a538c6ed01d7b474b0e51bf0b9736e64992852078c3"
+        },
+        "rh_trochanterfemur_body.obj": {
+          "bytes": 1640717,
+          "sha256": "cb156e6bc4920163ebb52b7a45a2e56173f98bb2eb6a1e67b08677305f5ababe"
+        },
+        "rm_coxa_body.obj": {
+          "bytes": 1244997,
+          "sha256": "965687d9a0bce1511c0d9af1e3f928eb41f904c44aeef38a6b334f42edefee41"
+        },
+        "rm_tarsus1_body.obj": {
+          "bytes": 605394,
+          "sha256": "8001e338bc91061f44ba00c37612d50a63c369d1910a011235892b97a299df35"
+        },
+        "rm_tarsus2_body.obj": {
+          "bytes": 421543,
+          "sha256": "85306a72a46c0b2b581cfaa383f82af1d73e282b9bbdf0aea60d1690cddc6b36"
+        },
+        "rm_tarsus3_body.obj": {
+          "bytes": 352255,
+          "sha256": "afff461a7b84d4cdbbad46ba7f04d3267a5815a54cb5e1342f7c8103af993051"
+        },
+        "rm_tarsus4_body.obj": {
+          "bytes": 319508,
+          "sha256": "749277fac68e413badea0a76ed204ad81ebbca1a1c9f72f3e7dc00b7582d520f"
+        },
+        "rm_tarsus5_brown.obj": {
+          "bytes": 868092,
+          "sha256": "b568c7f9c67959b3f3d6fc832ad735b6626530b7e136f027cde1a4855a4977ca"
+        },
+        "rm_tibia_body.obj": {
+          "bytes": 669281,
+          "sha256": "fe175d7e0366ce105544ada99591a53da1da3030cdc1a6aff66ae30619877d4b"
+        },
+        "rm_trochanterfemur_body.obj": {
+          "bytes": 1605906,
+          "sha256": "bac7f1c059d638095d365cc0217eb59c7d8d55745435bff3f1b3b8fb1b877e4e"
+        }
+      }
+    }
+  ],
+  "software_versions": {
+    "note": "from the uv environment (uv.lock) at generation time",
+    "flygym": "2.1.0 (Apache-2.0)",
+    "mujoco": "3.9.0 (Apache-2.0)",
+    "omnigent": "0.16.0 (Apache Software License)",
+    "anthropic_sdk": "1.11.0 (MIT)"
+  },
+  "committed_derived_data": {
+    "note": "small result files that ARE committed; hashes are of the files at generation time (they change when an experiment is re-run)",
+    "files": [
+      {
+        "path": "data/neurons.json",
+        "bytes": 166470,
+        "sha256": "65305755d3ec58c9ac2f159daabf6d84955baee91914d455ff8179b6c9d61579"
+      },
+      {
+        "path": "data/ground_truth.json",
+        "bytes": 30337,
+        "sha256": "50c3bd5b6adfbf73b52d46f5f8cc2e9d975a27efd3f9f1c6aeb198591545bce1"
+      },
+      {
+        "path": "data/benchmarks/brain_validation.json",
+        "bytes": 7758,
+        "sha256": "da822a6c55c01dfe42dd3dc0395752f676bac3ff408e4555ab4c0b797ea55fb0"
+      },
+      {
+        "path": "data/benchmarks/embodied_validation.json",
+        "bytes": 32240,
+        "sha256": "23edb05bbf79d59be6369c9d9563c4be16d5cfaa19f45949653bdab00078f139"
+      },
+      {
+        "path": "data/benchmarks/flight_validation.json",
+        "bytes": 102619,
+        "sha256": "fac66e4649dbf2f604ad1096b154d9339a6027a1d0100b03ab44286acf72f6e2"
+      },
+      {
+        "path": "data/benchmarks/movement_verifier.json",
+        "bytes": 16063,
+        "sha256": "82c2cad1b7c53f2e1a1a353d32ee5e1aed330490ec0d938be670c52387b0377b"
+      },
+      {
+        "path": "data/benchmarks/screen_gf.json",
+        "bytes": 112634,
+        "sha256": "1b5d7f0d98ee30245c091d20d822efa298d14d0f211b7fcbf314c8ad0f1680ed"
+      },
+      {
+        "path": "data/benchmarks/screen_mdn.json",
+        "bytes": 111981,
+        "sha256": "408b0811a5c90af73c303a7f87dc8f650e9f563a29fc24b58b8d4a1c38128e82"
+      }
+    ]
+  }
+}

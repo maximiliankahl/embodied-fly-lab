@@ -8,7 +8,7 @@ export const CLASS_COLORS = {
   sensory: '#5aa765', ascending: '#9a6cc4', descending: '#d08a2e', motor: '#c4504a', endocrine: '#c46aa0',
   unknown: '#9a9a9a',
 };
-export const ROLE_COLORS = { stimulated: '#ff3fd2', readout: '#00e0ff', silenced: '#7a7a7a' };
+export const ROLE_COLORS = { stimulated: '#ff3fd2', readout: '#00e0ff', silenced: '#7a7a7a', descending: '#19c25a' };
 
 function cssVar(name, fallback) {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -74,6 +74,13 @@ export class BrainView {
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   }
 
+  // faint all-neuron layer: opacity falls with canvas area so dense regions do not saturate on small (phone) canvases
+  baseOpacity() {
+    const w = this.container.clientWidth || 1, h = this.container.clientHeight || 1;
+    const k = Math.max(0.3, Math.min(1, (w * h) / (520 * 480)));
+    return (this.isDark() ? 0.34 : 0.3) * k;
+  }
+
   applyTheme() {
     const dark = this.isDark();
     this.scene.background = new THREE.Color(cssVar('--brain-bg', dark ? '#0d0e11' : '#f3f4f7'));
@@ -81,8 +88,8 @@ export class BrainView {
     this.glowMat.uniforms.uDark.value = dark ? 1 : 0;
     this.glowMat.needsUpdate = true;
     if (this.base) {
-      this.base.material.opacity = dark ? 0.28 : 0.3;
-      this.base.material.blending = dark ? THREE.AdditiveBlending : THREE.NormalBlending;
+      this.base.material.opacity = this.baseOpacity();
+      this.base.material.blending = THREE.NormalBlending; // additive would saturate the dense optic lobes to white
       this.base.material.needsUpdate = true;
     }
   }
@@ -94,7 +101,10 @@ export class BrainView {
     this.camera.updateProjectionMatrix();
     const px = h * this.renderer.getPixelRatio();
     this.glowMat.uniforms.uScale.value = px / (2 * Math.tan((this.camera.fov * Math.PI) / 360));
-    if (this.base) this.base.material.size = Math.max(1, 1.2 * this.renderer.getPixelRatio());
+    if (this.base) {
+      this.base.material.size = Math.max(1, 1.2 * this.renderer.getPixelRatio());
+      this.base.material.opacity = this.baseOpacity();
+    }
   }
 
   async load(metaUrl) {
@@ -155,21 +165,28 @@ export class BrainView {
     const seen = new Set(idx);
     for (const [i, r] of role) if (!seen.has(i) && r !== 'readout') entries.push([i, 0]);
     const m = entries.length;
+    const crowd = Math.max(0.3, Math.min(1, Math.sqrt(250 / Math.max(1, m))));
     const pos = new Float32Array(3 * m), col = new Float32Array(3 * m), size = new Float32Array(m);
     const c = new THREE.Color();
-    let k = 0;
+    const descClass = this.meta.classes.indexOf('descending');
+    let k = 0, nDesc = 0;
     for (const [i, rate] of entries) {
       const x = this.posByIdx[3 * i];
       if (!Number.isFinite(x)) continue;
       pos[3 * k] = x; pos[3 * k + 1] = this.posByIdx[3 * i + 1]; pos[3 * k + 2] = this.posByIdx[3 * i + 2];
-      const r = role.get(i) || 'downstream';
+      let r = role.get(i) || 'downstream';
+      if (r === 'downstream' && this.cls[i] === descClass) { r = 'descending'; nDesc++; }
       if (r === 'stimulated') c.set(ROLE_COLORS.stimulated);
       else if (r === 'readout') c.set(ROLE_COLORS.readout);
       else if (r === 'silenced') c.set(ROLE_COLORS.silenced);
+      else if (r === 'descending') c.set(ROLE_COLORS.descending);
       else heat(rate, c);
       col[3 * k] = c.r; col[3 * k + 1] = c.g; col[3 * k + 2] = c.b;
-      const boost = r === 'readout' ? 22 : r === 'stimulated' ? 14 : 0;
-      size[k] = 9 + 16 * Math.min(1, rate / 150) + boost;
+      // glow size grows with rate; with many active neurons (e.g. LPLC2 drive) shrink everything so the
+      // additive glow does not saturate to a white blob
+      const rx = Math.min(1, Math.log1p(rate) / Math.log1p(150));
+      const boost = r === 'readout' ? 22 : r === 'stimulated' ? 9 * crowd : r === 'descending' ? 8 * crowd : 0;
+      size[k] = (r === 'readout' ? 9 + 16 * rx : crowd * (4 + 18 * rx)) + boost;
       k++;
     }
     const geo = new THREE.BufferGeometry();
@@ -179,7 +196,7 @@ export class BrainView {
     this.active = new THREE.Points(geo, this.glowMat);
     this.active.renderOrder = 2;
     this.scene.add(this.active);
-    return { drawn: k };
+    return { drawn: k, descending: nDesc };
   }
 
   render() {

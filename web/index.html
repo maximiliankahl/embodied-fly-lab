@@ -7,6 +7,10 @@
 <meta name="description" content="Recorded 3D replays of in-silico fly experiments: FlyWire whole-brain model, descending-neuron bridge, physics body and an independent movement verifier.">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23b0722f'/%3E%3Cellipse cx='16' cy='18' rx='5' ry='9' fill='%23fff3e0'/%3E%3C/svg%3E">
+<script>
+  // remembered colour theme (per-viewer convenience; page works without storage)
+  try { var t = localStorage.getItem('flylab-theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
 <link rel="stylesheet" href="style.css">
 <script type="importmap">
 {
@@ -23,48 +27,58 @@
     <h1>Embodied Fly Lab <span class="thin">· 3D replay</span></h1>
     <p class="sub">FlyWire whole-brain model → descending-neuron bridge → physics fly body → movement verifier. Hack-Nation 7, Challenge 03.</p>
   </div>
-  <div class="replay-badge" role="note" title="Every frame shown here was computed offline by the Python pipeline and exported; nothing is simulated in your browser.">
-    <span class="dot" aria-hidden="true"></span>Recorded simulation replay · not live
+  <div class="top-right">
+    <div class="replay-badge" role="note" title="Every frame shown here was computed offline by the Python pipeline and exported; nothing is simulated in your browser.">
+      <span class="dot" aria-hidden="true"></span>Recorded simulation replay · not live
+    </div>
+    <button id="theme" class="icon-btn" type="button" aria-label="Colour theme: automatic" title="Colour theme (auto / light / dark)">Auto</button>
   </div>
 </header>
 
 <nav class="runs" id="runs" aria-label="Recorded runs"><span class="muted">Loading runs…</span></nav>
 
 <main>
-  <section class="views">
-    <figure class="panel view">
-      <figcaption>
-        <span class="tag">Body</span><span id="body-model" class="muted">physics simulation (MuJoCo)</span>
-        <span class="right" id="body-label"></span>
-      </figcaption>
-      <div class="canvas-wrap" id="fly-canvas"></div>
-      <div class="hint">Drag to orbit · scroll or pinch to zoom</div>
-    </figure>
-    <figure class="panel view">
-      <figcaption>
-        <span class="tag">Brain</span><span class="muted">138,639 neurons, FlyWire v783 · frontal view</span>
-        <span class="right" id="brain-label"></span>
-      </figcaption>
-      <div class="canvas-wrap" id="brain-canvas"></div>
-      <div class="legend" id="brain-legend"></div>
-    </figure>
-  </section>
+  <div class="stage">
+    <div class="stage-main">
+      <section class="views">
+        <figure class="panel view">
+          <figcaption>
+            <span class="tag">Body</span><span id="body-model" class="muted">physics simulation (MuJoCo)</span>
+            <span class="right" id="body-label"></span>
+          </figcaption>
+          <div class="canvas-wrap" id="fly-canvas"></div>
+          <div class="hint">Drag to orbit · scroll or pinch to zoom</div>
+        </figure>
+        <figure class="panel view">
+          <figcaption>
+            <span class="tag">Brain</span><span class="muted">138,639 neurons, FlyWire v783 · frontal view</span>
+            <span class="right" id="brain-label"></span>
+          </figcaption>
+          <div class="canvas-wrap" id="brain-canvas"></div>
+          <div class="legend" id="brain-legend"></div>
+        </figure>
+      </section>
 
-  <section class="timeline panel" aria-label="Replay controls">
-    <button id="play" class="btn" type="button">Pause</button>
-    <input type="range" id="scrub" min="0" max="1000" value="0" step="1" aria-label="Replay time">
-    <span id="time" class="mono">0.00 / 0.00 s</span>
-    <label class="ctl">Speed
-      <select id="speed">
-        <option value="0.1">0.1×</option>
-        <option value="0.25" selected>0.25×</option>
-        <option value="0.5">0.5×</option>
-        <option value="1">1× (real time)</option>
-      </select>
-    </label>
-    <label class="ctl"><input type="checkbox" id="follow" checked> Follow fly</label>
-  </section>
+      <section class="timeline panel" aria-label="Replay controls">
+        <button id="play" class="btn" type="button">Pause</button>
+        <input type="range" id="scrub" min="0" max="1000" value="0" step="1" aria-label="Replay time">
+        <span id="time" class="mono">0.00 / 0.00 s</span>
+        <label class="ctl">Speed
+          <select id="speed">
+            <option value="0.05">0.05×</option>
+            <option value="0.1">0.1×</option>
+            <option value="0.25" selected>0.25×</option>
+            <option value="0.5">0.5×</option>
+            <option value="1">1× (real time)</option>
+          </select>
+        </label>
+        <label class="ctl"><input type="checkbox" id="follow" checked> Follow fly</label>
+      </section>
+    </div>
+    <aside class="panel side" id="side" aria-live="polite" aria-label="Run summary"></aside>
+  </div>
 
+  <h2 class="section-h">Pipeline detail for this run</h2>
   <section class="pipeline" id="pipeline" aria-live="polite"></section>
 
   <section class="panel notes">
@@ -73,6 +87,7 @@
       <li><b>Recorded, not live.</b> Brain, bridge, body and verifier ran offline in Python (<code>flylab</code>); this page only plays back the exported files. Each run lists the command that reproduces it.</li>
       <li><b>Brain colours</b> show the <em>mean</em> firing rate of each neuron over a 1 s simulation of the whole-brain leaky integrate-and-fire model (Shiu et al. 2024). It is not time-resolved and runs open loop: the body does not feed back into the brain.</li>
       <li><b>What the connectome decides:</b> which descending neurons become active. The ventral nerve cord is <em>not</em> simulated; a frozen, hand-designed bridge turns descending-neuron rates into a 3-number walking drive (or a flight command). Leg and wing movements come from the body's physics controller, not from neurons. A body that can walk or fly is not by itself evidence of connectome control.</li>
+      <li><b>Flight is a simplified physics model.</b> The FlyBody fly is a rigid-body MuJoCo model; wing forces are wingbeat-averaged quasi-steady aerodynamics (no wake or unsteady effects), and the attitude stabiliser, jump impulse and wing kinematics are hand-designed stand-ins for halteres, visual feedback and the flight motor system. Flight frames are stroboscopic (about one frame per three wingbeats of 200 Hz) and are shown without interpolation.</li>
       <li><b>Verifier</b> verdicts are recomputed from the raw body trajectory, independently of the body's own behaviour label, and compared with the published experiment cited on each run.</li>
       <li><b>Agent hypotheses</b> come from the live Omnigent run record and are labelled as agent-generated; none is confirmed in the wet lab.</li>
     </ul>
