@@ -95,10 +95,14 @@ def _ground_truth_section() -> None:
     for e in gts:
         cit = e.get("citation") or {}
         v = val.get(str(e.get("id")), {})
+        raw = v.get("raw") if isinstance(v.get("raw"), dict) else {}
+        stim = [str(x) for x in ui.as_list(raw.get("stimulus_groups"))] or (
+            [str(e.get("target_group"))] if e.get("target_group") else [])
         rows.append({
             "id": e.get("id"),
             "manipulation": e.get("manipulation"),
             "target": e.get("target_group"),
+            "stimulus type": ui.stimulus_type(stim, raw.get("stimulus_type")),
             "published effect": f"{e.get('effect', 'induce')} {e.get('expected_behavior')}",
             "readout": e.get("readout_group") or "body",
             "simulated condition": v.get("condition") or "",
@@ -127,6 +131,20 @@ def _ground_truth_section() -> None:
     m[4].metric("Agreement", help="consistent / comparable informative checks (not_comparable, inconclusive and "
                 "uninformative checks excluded)", value=
                 f"{n_cons}/{len(comparable)} ({100 * n_cons / len(comparable):.0f}%)" if comparable else "n/a")
+    by_type: dict[str, list[int]] = {}
+    for r in rows:
+        vv = val.get(str(r["id"]), {})
+        verdict = str(vv.get("verdict"))
+        if vv and vv.get("informative") is not False and verdict not in ("not_comparable", "inconclusive", "None"):
+            b = by_type.setdefault(r["stimulus type"], [0, 0])
+            b[0] += int(verdict == "consistent")
+            b[1] += 1
+    if by_type:
+        st.markdown("Agreement by stimulus type: "
+                    + " · ".join(f"**{k}** {a}/{n}" for k, (a, n) in by_type.items())
+                    + ". Direct descending-neuron rows are partly circular (the adapter was designed from the same "
+                      "papers); upstream rows are emergent from the connectome model. Walking and brain-readout "
+                      "checks only; flight checks are counted separately below.")
     cav = vdoc.get("caveats") if isinstance(vdoc, dict) else None
     if isinstance(cav, list) and cav:
         st.info("**How to read these numbers**\n" + "\n".join(f"- {c}" for c in cav))
@@ -181,6 +199,48 @@ def _ground_truth_section() -> None:
     if vdoc is not None:
         with st.expander("Raw embodied_validation.json"):
             st.json(vdoc, expanded=False)
+
+
+def _flight_checks_section() -> None:
+    import pandas as pd
+
+    st.subheader("Flight checks (counted separately)")
+    doc = ui.load_json(ui.BENCH / "flight_validation.json")
+    rows = ui.flight_rows(doc)
+    if not rows:
+        ui.placeholder("data/benchmarks/flight_validation.json",
+                       "Flight conditions (giant fiber -> takeoff, flight DNs -> thrust and steering) appear here once "
+                       "the flight validation has run. They are not mixed into the walking numbers above.")
+        return
+    if any(r["mock"] for r in rows):
+        ui.mock_banner("Part of the flight validation file")
+    fs = ui.flight_summary(rows)
+    m = st.columns(4)
+    m[0].metric("Flight conditions", fs["n_conditions"])
+    m[1].metric("Published flight checks consistent",
+                f"{fs['n_gt_consistent']}/{fs['n_gt']}" if fs["n_gt"] else "n/a",
+                help="informative, comparable checks with a published flight/takeoff result")
+    m[2].metric("Movement verifier: correct", f"{fs['n_verified_correct']}/{fs['n_verified']}" if fs["n_verified"] else "n/a",
+                help="did the physics body perform the expected movement (independent of the published comparison)")
+    m[3].metric("Kinematic vs. vision agree", f"{fs['n_agree']}/{fs['n_both_verifiers']}" if fs["n_both_verifiers"] else "n/a")
+    if fs["by_stim_type"]:
+        st.markdown("Flight agreement by stimulus type: "
+                    + " · ".join(f"**{k}** {v['consistent']}/{v['n']}" for k, v in fs["by_stim_type"].items()))
+    gt = ui.ground_truth_by_id()
+    tab = []
+    for r in rows:
+        for c in (r["checks"] or [{"gt_id": "", "verdict": None}]):
+            cit = (gt.get(c.get("gt_id") or "") or {}).get("citation") or {}
+            tab.append({"condition": str(r["condition"]), "stimulus type": r["stim_type"],
+                        "expected": str(r["expected"] or ""), "behaviour": str(r["behavior"] or ""),
+                        "verifier": str(r["verify"].get("final") or "not run"),
+                        "ground truth": c.get("gt_id") or "no published comparison",
+                        "verdict": str(c.get("verdict") or "").replace("_", " ")
+                                   + (" (uninformative)" if c.get("informative") is False else ""),
+                        "paper": ui.doi_url(cit.get("doi"))})
+    st.dataframe(pd.DataFrame(tab), hide_index=True, width="stretch",
+                 column_config={"paper": st.column_config.LinkColumn("paper (DOI)", display_text=r"https://doi\.org/(.*)")})
+    st.caption("Details, videos, contact sheets and the 3D replay: page 'Flight & 3D'.")
 
 
 def _screen_summary_row(path, doc: dict) -> dict:
@@ -395,6 +455,13 @@ def _walltime_rows(include_mock: bool) -> list[dict]:
                 if isinstance(art, dict):
                     brain_s = art.get("brain_runtime_s")
                     body_s = (art.get("body") or {}).get("runtime_s") if isinstance(art.get("body"), dict) else None
+            elif kind in ("flight", "embodied_flight"):
+                art = ui.load_json(d["artifact"]) if d.get("artifact") else None
+                art = art if isinstance(art, dict) else {}
+                brain_s = art.get("brain_runtime_s", d.get("brain_runtime_s"))
+                body_s = ui.dig(art, "flight.runtime_s", "body.runtime_s", default=d.get("flight_runtime_s"))
+                if brain_s is None and body_s is None:
+                    body_s = d.get("runtime_s")
             total = sum(float(x) for x in (brain_s, body_s) if isinstance(x, (int, float)))
             rows.append({"source": f"run {rid} #{e.get('seq')}", "kind": kind, "brain_s": brain_s,
                          "body_s": body_s,
@@ -408,6 +475,14 @@ def _walltime_rows(include_mock: bool) -> list[dict]:
                 rows.append({"source": f"validation sweep: {r.get('condition')}", "kind": "embodied",
                              "brain_s": rts.get("brain"), "body_s": rts.get("body"), "total_s": rts.get("total"),
                              "mock": bool(r.get("mock"))})
+    for r in ui.flight_rows(ui.load_json(ui.BENCH / "flight_validation.json")):
+        rts = r["runtimes"]
+        if rts or r["wall_s"] is not None:
+            rows.append({"source": f"flight validation: {r['condition']}", "kind": "flight",
+                         "brain_s": rts.get("brain"), "body_s": rts.get("flight", rts.get("body")),
+                         "total_s": r["wall_s"] if r["wall_s"] is not None else
+                         round(sum(float(x) for x in rts.values() if isinstance(x, (int, float))), 2),
+                         "mock": r["mock"]})
     # Several screen benchmarks (e.g. MDN and GF targets) replay the SAME cached whole-brain simulations
     # (one simulation per candidate, all target groups read out). Count each simulation once.
     seen: dict[tuple, dict] = {}
@@ -518,6 +593,7 @@ def page() -> None:
     tabs = st.tabs(["Ground truth", "Acceleration", "Wall time", "Brain-model fidelity"])
     with tabs[0]:
         _ground_truth_section()
+        _flight_checks_section()
     with tabs[1]:
         _screen_section()
     with tabs[2]:

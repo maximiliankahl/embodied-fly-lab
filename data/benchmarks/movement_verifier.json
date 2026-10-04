@@ -1,0 +1,446 @@
+{
+ "what": "Movement verifier test on committed embodied videos (known labels = body-classifier labels)",
+ "created": "2026-10-04 02:31:42",
+ "verifier": "flylab/verify.py",
+ "prompt_version": "v2",
+ "vision_min_confidence": 0.65,
+ "caveats": [
+  "5 of 10 videos are byte-identical (zero drive -> fly stands still), so vision accuracy is reported on unique videos",
+  "known labels come from flylab.body.classify on the same trajectories; the verifier's kinematic check uses its own formulas/thresholds but the same physics, so agreement is a consistency check, not ground truth",
+  "top-down tracking camera + periodic checkerboard floor makes translation direction hard to read from keyframes"
+ ],
+ "summary": {
+  "n_runs": 10,
+  "n_unique_videos": 6,
+  "kinematic_correct_on_known_label": 10,
+  "kinematic_incorrect_on_opposite_label": 10,
+  "vision_exact_on_unique_videos": 4,
+  "vision_unique_videos": 6,
+  "final_correct_on_known_label": 8,
+  "final_uncertain_on_known_label": 2,
+  "final_correct_on_opposite_label": 0,
+  "new_api_tokens_this_run": {
+   "input": 10468,
+   "output": 1201
+  }
+ },
+ "rows": [
+  {
+   "condition": "control",
+   "video": "assets/embodied/control.mp4",
+   "known_label": "stop",
+   "gt_id": null,
+   "kinematic_verdict": "correct",
+   "kinematic_reason": "all checks passed",
+   "recomputed": {
+    "duration_s": 1.0,
+    "n_samples": 101,
+    "forward_disp_initial_frame_mm": 0.033,
+    "lateral_disp_initial_frame_mm": 0.008,
+    "body_frame_forward_speed_mm_s": 0.033,
+    "body_frame_lateral_speed_mm_s": 0.008,
+    "net_speed_mm_s": 0.034,
+    "path_speed_mm_s": 0.054,
+    "heading_change_deg": 0.22,
+    "yaw_rate_deg_s": 0.22,
+    "upright_min_cos": 1.0,
+    "fell_over": false
+   },
+   "vision_observed": "stop",
+   "vision_confidence": 0.8,
+   "vision_correct": true,
+   "vision_observations": [
+    "Fly heading stays pointed right (head at right) with same body axis orientation across tiles 1-16.",
+    "Checker edges remain at the same positions in every tile (e.g., vertical edges near x~68 and ~158 in tiles 1, 8, 16), indicating no displacement.",
+    "Only minor leg posture differences between tiles (e.g., tiles 3, 7, 11 vs 1)."
+   ],
+   "vision_model": "claude-opus-5-5",
+   "final_verdict": "correct",
+   "agreement": true,
+   "negative_control": {
+    "expected": "forward",
+    "kinematic": "incorrect",
+    "final": "incorrect"
+   },
+   "video_sha256": "37f4cd72c37d251d83093860d81e4e6370b60d6ad4f01bf6421415dfebf98903",
+   "wall_s": 6.8,
+   "vision_error": null
+  },
+  {
+   "condition": "MDN_bilateral",
+   "video": "assets/embodied/MDN_bilateral.mp4",
+   "known_label": "backward",
+   "gt_id": "gt01_mdn_activate_backward",
+   "kinematic_verdict": "correct",
+   "kinematic_reason": "all checks passed",
+   "recomputed": {
+    "duration_s": 1.0,
+    "n_samples": 101,
+    "forward_disp_initial_frame_mm": -9.791,
+    "lateral_disp_initial_frame_mm": 0.154,
+    "body_frame_forward_speed_mm_s": -9.812,
+    "body_frame_lateral_speed_mm_s": 0.105,
+    "net_speed_mm_s": 9.792,
+    "path_speed_mm_s": 14.089,
+    "heading_change_deg": -20.81,
+    "yaw_rate_deg_s": -20.81,
+    "upright_min_cos": 0.875,
+    "fell_over": false
+   },
+   "vision_observed": "forward",
+   "vision_confidence": 0.6,
+   "vision_correct": false,
+   "vision_observations": [
+    "Fly faces right (red eyes on right) in all tiles; body axis stays roughly horizontal, slight tilt in tiles 14 and 16 but not sustained.",
+    "Checker vertical edges shift leftward between tiles (e.g., edge near x~160 in tile 1 to ~118 in tile 5, ~92 in tile 9), consistent with fly moving toward its head.",
+    "Legs show stepping postures varying across tiles, indicating walking."
+   ],
+   "vision_model": "claude-opus-5-5",
+   "final_verdict": "uncertain",
+   "agreement": false,
+   "negative_control": {
+    "expected": "forward",
+    "kinematic": "incorrect",
+    "final": "uncertain"
+   },
+   "video_sha256": "edd1ca41ee97d4438ab24e0a0b27d230ff49b8c1033e498dd49826dce746352d",
+   "wall_s": 0.4,
+   "vision_error": null
+  },
+  {
+   "condition": "P9_bilateral",
+   "video": "assets/embodied/P9_bilateral.mp4",
+   "known_label": "forward",
+   "gt_id": "gt03_p9_activate_forward",
+   "kinematic_verdict": "correct",
+   "kinematic_reason": "all checks passed",
+   "recomputed": {
+    "duration_s": 1.0,
+    "n_samples": 101,
+    "forward_disp_initial_frame_mm": 13.569,
+    "lateral_disp_initial_frame_mm": -4.39,
+    "body_frame_forward_speed_mm_s": 14.326,
+    "body_frame_lateral_speed_mm_s": -0.249,
+    "net_speed_mm_s": 14.262,
+    "path_speed_mm_s": 15.426,
+    "heading_change_deg": -26.01,
+    "yaw_rate_deg_s": -26.01,
+    "upright_min_cos": 0.989,
+    "fell_over": false
+   },
+   "vision_observed": "turn_right",
+   "vision_confidence": 0.7,
+   "vision_correct": false,
+   "vision_observations": [
+    "Tiles 1-2: body axis horizontal, head (red eyes) pointing right.",
+    "Tiles 7-10: head has rotated slightly downward, abdomen tilting up-left.",
+    "Tiles 12-16: clear clockwise rotation; head points down-right, wings up-left.",
+    "Checkerboard edges shift between tiles, consistent with the fly also moving while it rotates clockwise."
+   ],
+   "vision_model": "claude-opus-5-5",
+   "final_verdict": "uncertain",
+   "agreement": false,
+   "negative_control": {
+    "expected": "backward",
+    "kinematic": "incorrect",
+    "final": "incorrect"
+   },
+   "video_sha256": "c219eaa88416c41e40df49c6ab46c4cbac2b1b971ddeac487aa9389147cc5aa7",
+   "wall_s": 0.3,
+   "vision_error": null
+  },
+  {
+   "condition": "P9_L",
+   "video": "assets/embodied/P9_L.mp4",
+   "known_label": "turn_left",
+   "gt_id": "gt04_p9L_activate_turn_left",
+   "kinematic_verdict": "correct",
+   "kinematic_reason": "all checks passed",
+   "recomputed": {
+    "duration_s": 1.0,
+    "n_samples": 101,
+    "forward_disp_initial_frame_mm": -0.39,
+    "lateral_disp_initial_frame_mm": 4.061,
+    "body_frame_forward_speed_mm_s": 7.397,
+    "body_frame_lateral_speed_mm_s": 0.581,
+    "net_speed_mm_s": 4.08,
+    "path_speed_mm_s": 8.119,
+    "heading_change_deg": 186.45,
+    "yaw_rate_deg_s": 186.45,
+    "upright_min_cos": 0.986,
+    "fell_over": false
+   },
+   "vision_observed": "turn_left",
+   "vision_confidence": 0.85,
+   "vision_correct": true,
+   "vision_observations": [
+    "Tile 1: head (red eyes) points right/east",
+    "Tiles 4-5: head points up-right",
+    "Tiles 6-9: head points up/north",
+    "Tiles 10-13: head swings to up-left",
+    "Tile 16: head points left/west, a ~180\u00b0 counter-clockwise rotation overall"
+   ],
+   "vision_model": "claude-opus-5-5",
+   "final_verdict": "correct",
+   "agreement": true,
+   "negative_control": {
+    "expected": "turn_right",
+    "kinematic": "incorrect",
+    "final": "incorrect"
+   },
+   "video_sha256": "85986a47bce3dbbd7b502df1c49c68fffcfb7ea9fbde40fb9400fda82460972f",
+   "wall_s": 5.3,
+   "vision_error": null
+  },
+  {
+   "condition": "DNa02_L",
+   "video": "assets/embodied/DNa02_L.mp4",
+   "known_label": "turn_left",
+   "gt_id": "gt05_dna02L_activate_turn_left",
+   "kinematic_verdict": "correct",
+   "kinematic_reason": "all checks passed",
+   "recomputed": {
+    "duration_s": 1.0,
+    "n_samples": 101,
+    "forward_disp_initial_frame_mm": -0.472,
+    "lateral_disp_initial_frame_mm": -0.108,
+    "body_frame_forward_speed_mm_s": 3.323,
+    "body_frame_lateral_speed_mm_s": 0.81,
+    "net_speed_mm_s": 0.484,
+    "path_speed_mm_s": 7.775,
+    "heading_change_deg": 318.27,
+    "yaw_rate_deg_s": 318.27,
+    "upright_min_cos": 0.966,
+    "fell_over": false
+   },
+   "vision_observed": "turn_left",
+   "vision_confidence": 0.8,
+   "vision_correct": true,
+   "vision_observations": [
+    "Tile 1: head points right (east)",
+    "Tiles 4-5: head swings to point up (north)",
+    "Tiles 8-9: head points left (west)",
+    "Tiles 13-16: head points down then down-right, nearly a full counter-clockwise rotation",
+    "The fly stays near the image centre and the body axis rotates steadily in one direction, consistent with a sustained counter-clockwise turn rather than straight walking"
+   ],
+   "vision_model": "claude-opus-5-5",
+   "final_verdict": "correct",
+   "agreement": true,
+   "negative_control": {
+    "expected": "turn_right",
+    "kinematic": "incorrect",
+    "final": "incorrect"
+   },
+   "video_sha256": "be6d3d4eecefa0b824508d2400ec779c1933c0a5d8b67d34509a1bf7c323ced6",
+   "wall_s": 6.3,
+   "vision_error": null
+  },
+  {
+   "condition": "DNa02_R",
+   "video": "assets/embodied/DNa02_R.mp4",
+   "known_label": "turn_right",
+   "gt_id": "gt06_dna02R_activate_turn_right",
+   "kinematic_verdict": "correct",
+   "kinematic_reason": "all checks passed",
+   "recomputed": {
+    "duration_s": 1.0,
+    "n_samples": 101,
+    "forward_disp_initial_frame_mm": 0.349,
+    "lateral_disp_initial_frame_mm": 0.055,
+    "body_frame_forward_speed_mm_s": 3.674,
+    "body_frame_lateral_speed_mm_s": -1.262,
+    "net_speed_mm_s": 0.353,
+    "path_speed_mm_s": 8.176,
+    "heading_change_deg": -328.3,
+    "yaw_rate_deg_s": -328.3,
+    "upright_min_cos": 0.955,
+    "fell_over": false
+   },
+   "vision_observed": "turn_right",
+   "vision_confidence": 0.85,
+   "vision_correct": true,
+   "vision_observations": [
+    "Tile 1: head points right (east)",
+    "Tiles 4-6: head rotates to point downward (south)",
+    "Tiles 8-10: head points left (west)",
+    "Tiles 12-14: head points up (north); tile 16 back toward east-northeast",
+    "Consistent clockwise rotation of body axis seen from above, about a full turn"
+   ],
+   "vision_model": "claude-opus-5-5",
+   "final_verdict": "correct",
+   "agreement": true,
+   "negative_control": {
+    "expected": "turn_left",
+    "kinematic": "incorrect",
+    "final": "incorrect"
+   },
+   "video_sha256": "4ffa21322af45cd5a224ea7f075626d8760d63be8b99d34f5b88f131dd282f12",
+   "wall_s": 6.3,
+   "vision_error": null
+  },
+  {
+   "condition": "LPLC2_bilateral",
+   "video": "assets/embodied/LPLC2_bilateral.mp4",
+   "known_label": "stop",
+   "gt_id": "gt19_lplc2_activate_backward",
+   "kinematic_verdict": "correct",
+   "kinematic_reason": "all checks passed",
+   "recomputed": {
+    "duration_s": 1.0,
+    "n_samples": 101,
+    "forward_disp_initial_frame_mm": 0.033,
+    "lateral_disp_initial_frame_mm": 0.008,
+    "body_frame_forward_speed_mm_s": 0.033,
+    "body_frame_lateral_speed_mm_s": 0.008,
+    "net_speed_mm_s": 0.034,
+    "path_speed_mm_s": 0.054,
+    "heading_change_deg": 0.22,
+    "yaw_rate_deg_s": 0.22,
+    "upright_min_cos": 1.0,
+    "fell_over": false
+   },
+   "vision_observed": "stop",
+   "vision_confidence": 0.8,
+   "vision_correct": true,
+   "vision_observations": [
+    "Fly heading stays pointed right (head at right) with same body axis orientation across tiles 1-16.",
+    "Checker edges remain at the same positions in every tile (e.g., vertical edges near x~68 and ~158 in tiles 1, 8, 16), indicating no displacement.",
+    "Only minor leg posture differences between tiles (e.g., tiles 3, 7, 11 vs 1)."
+   ],
+   "vision_model": "claude-opus-5-5",
+   "final_verdict": "correct",
+   "agreement": true,
+   "negative_control": {
+    "expected": "forward",
+    "kinematic": "incorrect",
+    "final": "incorrect"
+   },
+   "video_sha256": "37f4cd72c37d251d83093860d81e4e6370b60d6ad4f01bf6421415dfebf98903",
+   "wall_s": 0.4,
+   "vision_error": null
+  },
+  {
+   "condition": "LPLC2_MDN_silenced",
+   "video": "assets/embodied/LPLC2_MDN_silenced.mp4",
+   "known_label": "stop",
+   "gt_id": "gt02_mdn_silence_backward",
+   "kinematic_verdict": "correct",
+   "kinematic_reason": "all checks passed",
+   "recomputed": {
+    "duration_s": 1.0,
+    "n_samples": 101,
+    "forward_disp_initial_frame_mm": 0.033,
+    "lateral_disp_initial_frame_mm": 0.008,
+    "body_frame_forward_speed_mm_s": 0.033,
+    "body_frame_lateral_speed_mm_s": 0.008,
+    "net_speed_mm_s": 0.034,
+    "path_speed_mm_s": 0.054,
+    "heading_change_deg": 0.22,
+    "yaw_rate_deg_s": 0.22,
+    "upright_min_cos": 1.0,
+    "fell_over": false
+   },
+   "vision_observed": "stop",
+   "vision_confidence": 0.8,
+   "vision_correct": true,
+   "vision_observations": [
+    "Fly heading stays pointed right (head at right) with same body axis orientation across tiles 1-16.",
+    "Checker edges remain at the same positions in every tile (e.g., vertical edges near x~68 and ~158 in tiles 1, 8, 16), indicating no displacement.",
+    "Only minor leg posture differences between tiles (e.g., tiles 3, 7, 11 vs 1)."
+   ],
+   "vision_model": "claude-opus-5-5",
+   "final_verdict": "correct",
+   "agreement": true,
+   "negative_control": {
+    "expected": "forward",
+    "kinematic": "incorrect",
+    "final": "incorrect"
+   },
+   "video_sha256": "37f4cd72c37d251d83093860d81e4e6370b60d6ad4f01bf6421415dfebf98903",
+   "wall_s": 0.3,
+   "vision_error": null
+  },
+  {
+   "condition": "sugar_GRN",
+   "video": "assets/embodied/sugar_GRN.mp4",
+   "known_label": "stop",
+   "gt_id": "gt10_sugar_activate_feed",
+   "kinematic_verdict": "correct",
+   "kinematic_reason": "all checks passed",
+   "recomputed": {
+    "duration_s": 1.0,
+    "n_samples": 101,
+    "forward_disp_initial_frame_mm": 0.033,
+    "lateral_disp_initial_frame_mm": 0.008,
+    "body_frame_forward_speed_mm_s": 0.033,
+    "body_frame_lateral_speed_mm_s": 0.008,
+    "net_speed_mm_s": 0.034,
+    "path_speed_mm_s": 0.054,
+    "heading_change_deg": 0.22,
+    "yaw_rate_deg_s": 0.22,
+    "upright_min_cos": 1.0,
+    "fell_over": false
+   },
+   "vision_observed": "stop",
+   "vision_confidence": 0.8,
+   "vision_correct": true,
+   "vision_observations": [
+    "Fly heading stays pointed right (head at right) with same body axis orientation across tiles 1-16.",
+    "Checker edges remain at the same positions in every tile (e.g., vertical edges near x~68 and ~158 in tiles 1, 8, 16), indicating no displacement.",
+    "Only minor leg posture differences between tiles (e.g., tiles 3, 7, 11 vs 1)."
+   ],
+   "vision_model": "claude-opus-5-5",
+   "final_verdict": "correct",
+   "agreement": true,
+   "negative_control": {
+    "expected": "forward",
+    "kinematic": "incorrect",
+    "final": "incorrect"
+   },
+   "video_sha256": "37f4cd72c37d251d83093860d81e4e6370b60d6ad4f01bf6421415dfebf98903",
+   "wall_s": 0.4,
+   "vision_error": null
+  },
+  {
+   "condition": "JO_CE",
+   "video": "assets/embodied/JO_CE.mp4",
+   "known_label": "stop",
+   "gt_id": "gt14_jo_activate_groom",
+   "kinematic_verdict": "correct",
+   "kinematic_reason": "all checks passed",
+   "recomputed": {
+    "duration_s": 1.0,
+    "n_samples": 101,
+    "forward_disp_initial_frame_mm": 0.033,
+    "lateral_disp_initial_frame_mm": 0.008,
+    "body_frame_forward_speed_mm_s": 0.033,
+    "body_frame_lateral_speed_mm_s": 0.008,
+    "net_speed_mm_s": 0.034,
+    "path_speed_mm_s": 0.054,
+    "heading_change_deg": 0.22,
+    "yaw_rate_deg_s": 0.22,
+    "upright_min_cos": 1.0,
+    "fell_over": false
+   },
+   "vision_observed": "stop",
+   "vision_confidence": 0.8,
+   "vision_correct": true,
+   "vision_observations": [
+    "Fly heading stays pointed right (head at right) with same body axis orientation across tiles 1-16.",
+    "Checker edges remain at the same positions in every tile (e.g., vertical edges near x~68 and ~158 in tiles 1, 8, 16), indicating no displacement.",
+    "Only minor leg posture differences between tiles (e.g., tiles 3, 7, 11 vs 1)."
+   ],
+   "vision_model": "claude-opus-5-5",
+   "final_verdict": "correct",
+   "agreement": true,
+   "negative_control": {
+    "expected": "forward",
+    "kinematic": "incorrect",
+    "final": "incorrect"
+   },
+   "video_sha256": "37f4cd72c37d251d83093860d81e4e6370b60d6ad4f01bf6421415dfebf98903",
+   "wall_s": 0.4,
+   "vision_error": null
+  }
+ ]
+}

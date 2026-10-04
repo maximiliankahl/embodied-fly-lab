@@ -27,6 +27,7 @@ derives JSON schemas from real annotation objects.
 import json
 import re
 import os
+import threading
 import time
 import traceback
 from pathlib import Path
@@ -35,7 +36,7 @@ from typing import Any
 from flylab import record
 
 MOCK_NOTICE = "MOCK DATA (FLYLAB_MOCK) - plausible placeholder, NOT a simulation or literature result."
-_COMPONENTS = ("atlas", "literature", "brain", "body", "bridge", "screen")
+_COMPONENTS = ("atlas", "literature", "brain", "body", "bridge", "screen", "flight")
 BEHAVIORS = ("forward", "backward", "turn_left", "turn_right", "stop", "escape", "groom", "feed")
 BODY_BEHAVIORS = ("forward", "backward", "turn_left", "turn_right", "stop")  # what flylab.body can classify
 TURNS = {"turn_left", "turn_right"}
@@ -129,19 +130,27 @@ def _err(tool: str, exc: BaseException, run_id: str | None = None, agent: str = 
     return out
 
 
+_ARTIFACT_LOCK = threading.Lock()
+
+
 def _next_artifact(run_id: str, prefix: str, ext: str) -> Path:
     """Next free ``<prefix>_NN.<ext>``. NN is free only if NO file with that stem exists (any
     extension), so the .mp4 and .json of one run share the same number even when a run
-    produced no video (mock mode, render failure)."""
+    produced no video (mock mode, render failure). Thread-safe: the number is reserved with an
+    empty ``<prefix>_NN.reserved`` marker (removed by _save_json) so parallel experiments
+    (run_experiments_parallel) never share a number."""
     d = record.artifacts_dir(run_id)
-    i = 1
-    while any(d.glob(f"{prefix}_{i:02d}.*")):
-        i += 1
+    with _ARTIFACT_LOCK:
+        i = 1
+        while any(d.glob(f"{prefix}_{i:02d}.*")):
+            i += 1
+        (d / f"{prefix}_{i:02d}.reserved").touch()
     return d / f"{prefix}_{i:02d}.{ext}"
 
 
 def _save_json(path: Path, obj: Any) -> str:
     path.write_text(json.dumps(record._jsonable(obj), indent=1), encoding="utf-8")
+    path.with_suffix(".reserved").unlink(missing_ok=True)
     return str(path.relative_to(record.ROOT)).replace("\\", "/")
 
 
@@ -290,6 +299,9 @@ def _group_rates(rates: dict[str, float], role: str | None = "descending") -> di
     return out
 
 
+_BRAIN_THREADS: int | None = None  # set by run_experiments_parallel (keeps total CPU threads bounded)
+
+
 def _simulate_brain(excite_names: list[str], silence_names: list[str], rate_hz: float,
                     duration_ms: float, n_trials: int, seed: int = 0) -> tuple[dict, dict]:
     ex_ids, ex_counts, ex_unknown = _resolve_groups(excite_names)
@@ -303,8 +315,9 @@ def _simulate_brain(excite_names: list[str], silence_names: list[str], rate_hz: 
         res = _mock_brain(excite_names, silence_names, rate_hz, duration_ms)
     else:
         from flylab import brain
+        kw = {"n_threads": _BRAIN_THREADS} if _BRAIN_THREADS else {}
         res = brain.simulate(ex_ids, si_ids or None, excite_rate_hz=float(rate_hz),
-                             duration_ms=float(duration_ms), n_trials=int(n_trials), seed=int(seed))
+                             duration_ms=float(duration_ms), n_trials=int(n_trials), seed=int(seed), **kw)
     return res, meta
 
 
@@ -740,7 +753,11 @@ def run_body_experiment(forward: float = 1.0, turn: float = 0.0, backward: float
     drive = {"forward": forward, "turn": turn, "backward": backward}
     try:
         video = str(_next_artifact(rid, "body", "mp4")) if render else None
-        res = _simulate_body(drive, duration_s, video)
+        try:
+            res = _simulate_body(drive, duration_s, video)
+        finally:
+            if video:
+                Path(video).with_suffix(".reserved").unlink(missing_ok=True)
         summ = _body_summary(res, duration_s)
         out = {"ok": True, "run_id": rid, "kind": "body", "drive": drive, **summ, "mock": _mock("body")}
         if _mock("body"):
@@ -805,12 +822,180 @@ def run_embodied_experiment(excite_groups: list, silence_groups: list = None, ra
         return _err("run_embodied_experiment", exc, rid, agent)
 
 
+# =========================================================================== flight tools (Phase 3)
+# flylab.flight (FlyBody wings in MuJoCo) and bridge.rates_to_flight_command were written concurrently with
+# these tools. Both are imported lazily. If a module/function is missing (or FLYLAB_MOCK includes "flight"),
+# the tools return CLEARLY LABELLED mock data ("mock": true + "mock_reason") - never silently fake results.
+
+FLIGHT_REF_RATE_HZ = 148.3  # same reference rate as flylab.bridge (rates_to_drive)
+
+
+def _mock_flight(command: dict, duration_s: float, reason: str) -> dict:
+    tk, th = float(command.get("takeoff", 0)), float(command.get("thrust", 0))
+    yw, pt = float(command.get("yaw", 0)), float(command.get("pitch", 0))
+    airborne = tk >= 0.5
+    traj = []
+    n = 20
+    for k in range(n + 1):
+        t = duration_s * k / n
+        up = airborne and t >= 0.1
+        z = 1.0 + (min(t - 0.1, 0.3) * 20.0 * (0.5 + th) if up else 0.0)
+        x = 30.0 * pt * max(t - 0.1, 0) if up else 0.0
+        traj.append([round(t, 3), round(x, 3), 0.0, round(z, 3), 0.0, round(10 * pt, 2), round(-90.0 * yw * t, 2)])
+    beh = "no_takeoff" if not airborne else ("flight_turn_left" if yw < -0.3 else "flight_turn_right" if yw > 0.3
+                                             else "forward_flight" if pt > 0.3 else "climb" if th > 0.5 else "hover")
+    return {"trajectory": traj, "airborne": airborne, "takeoff_time_s": 0.1 if airborne else None,
+            "flight_time_s": round(duration_s - 0.1, 3) if airborne else 0.0,
+            "max_height_mm": round(max(r[3] for r in traj), 3),
+            "net_displacement_mm": [traj[-1][1], 0.0, round(traj[-1][3] - 1.0, 3)],
+            "heading_change_deg": traj[-1][6], "behavior": beh, "video": None, "runtime_s": 0.01,
+            "mock": True, "mock_reason": reason, "notice": MOCK_NOTICE}
+
+
+def _simulate_flight(command: dict, duration_s: float, render_path: str | None, seed: int = 0) -> dict:
+    cmd = {k: float(command.get(k, 0.0) or 0.0) for k in ("takeoff", "thrust", "yaw", "pitch")}
+    if _mock("flight"):
+        return _mock_flight(cmd, duration_s, "FLYLAB_MOCK includes flight")
+    try:
+        from flylab import flight
+        fn = flight.simulate_flight
+    except (ImportError, AttributeError) as exc:
+        return _mock_flight(cmd, duration_s, f"flylab.flight not available yet ({type(exc).__name__})")
+    return fn(cmd, duration_s=float(duration_s), render_path=render_path, seed=int(seed))
+
+
+def _flight_command_from_rates(rates: dict[str, float]) -> tuple[dict, dict]:
+    """Per-neuron rates -> flight command via flylab.bridge.rates_to_flight_command (Phase 3 contract).
+    Fallback (labelled MOCK) while the bridge function does not exist: takeoff = GF mean rate / ref rate."""
+    try:
+        from flylab import bridge
+        fn = bridge.rates_to_flight_command
+    except (ImportError, AttributeError) as exc:
+        g = _group_rates(rates, role=None)
+        gf = max([v for k, v in g.items() if k == "GF" or k.startswith("GF_")] or [0.0])
+        tk = round(min(gf / FLIGHT_REF_RATE_HZ, 1.0), 3)
+        cmd = {"takeoff": tk, "thrust": tk, "yaw": 0.0, "pitch": 0.0}
+        return cmd, {"bridge": "MOCK flight bridge (bridge.rates_to_flight_command not available yet: "
+                               f"{type(exc).__name__}); takeoff = thrust = GF rate / {FLIGHT_REF_RATE_HZ} Hz",
+                     "mock": True, "gf_rate_hz": gf}
+    cmd = fn(rates)
+    return cmd, {"bridge": "flylab.bridge.rates_to_flight_command",
+                 "explain": cmd.get("explain") if isinstance(cmd, dict) else None}
+
+
+def _flight_summary(res: dict) -> dict:
+    keys = ("behavior", "airborne", "takeoff_time_s", "flight_time_s", "max_height_mm", "net_displacement_mm",
+            "heading_change_deg", "mean_speed_mm_s", "runtime_s", "model_notes")
+    out = {k: res.get(k) for k in keys if k in res}
+    out["video"] = _rel(res.get("video"))
+    traj = res.get("trajectory") or []
+    out["trajectory_points"] = len(traj)
+    if traj:
+        out["trajectory_end"] = traj[-1]
+    if res.get("mock"):
+        out["mock_reason"] = res.get("mock_reason")
+    return out
+
+
+def run_flight_experiment(takeoff: float = 1.0, thrust: float = 0.6, yaw: float = 0.0, pitch: float = 0.0,
+                          duration_s: float = 1.0, render: bool = True, seed: int = 0, agent: str = "runner",
+                          run_id: str = "") -> dict:
+    """Drive the flying fly body (FlyBody wings in MuJoCo, flylab.flight) directly with a flight command (no brain).
+    Use it as a body-only CONTROL: it shows what the flight controller does by itself (G4: a body that can fly is
+    not evidence of connectome control).
+    :param takeoff: 0..1 takeoff trigger (escape/GF-like leg jump + wing start).
+    :param thrust: 0..1 wing-stroke amplitude.
+    :param yaw: -1..1 steering (negative = left).
+    :param pitch: -1..1 (negative = backward, positive = forward).
+    :param duration_s: Simulated seconds (0.5-2).
+    :param render: Save an mp4 into runs/<id>/artifacts.
+    :param seed: Random seed.
+    :param agent: Calling agent role name.
+    :param run_id: Run id; default = active run.
+    :returns: flight behavior label, airborne, takeoff time, max height, displacement, heading change, video,
+        artifact (flightbody_NN.json - pass it to verify_movement), mock flag.
+    """
+    rid = _rid(run_id)
+    cmd = {"takeoff": takeoff, "thrust": thrust, "yaw": yaw, "pitch": pitch}
+    try:
+        video_path = _next_artifact(rid, "flightbody", "mp4")
+        res = _simulate_flight(cmd, duration_s, str(video_path) if render else None, seed)
+        summ = _flight_summary(res)
+        mock = bool(res.get("mock"))
+        path = _save_json(video_path.with_suffix(".json"), {"inputs": {**cmd, "duration_s": duration_s, "seed": seed},
+                                                            "command": cmd, "flight": res, "mock": mock})
+        out = {"ok": True, "run_id": rid, "kind": "flight_body", "command": cmd, **summ, "artifact": path, "mock": mock}
+        if mock:
+            out["notice"] = MOCK_NOTICE
+        record.log_event(rid, agent, "experiment_result",
+                         f"Flight body (no brain): command={cmd} -> {summ.get('behavior')}" + (" [MOCK]" if mock else ""),
+                         {"kind": "flight_body", "command": cmd, **summ, "artifact": path, "mock": mock})
+        return out
+    except Exception as exc:
+        return _err("run_flight_experiment", exc, rid, agent)
+
+
+def run_embodied_flight(excite_groups: list, silence_groups: list = None, rate_hz: float = 150.0,
+                        duration_ms: float = 1000.0, n_trials: int = 3, duration_s: float = 1.0, seed: int = 0,
+                        agent: str = "runner", run_id: str = "") -> dict:
+    """Closed chain for FLIGHT: connectome brain -> descending-neuron rates -> bridge.rates_to_flight_command
+    (GF -> takeoff, flight-motor DNs -> thrust, L/R asymmetry -> yaw) -> flying fly body -> behavior + video.
+    EXPENSIVE: requires human approval (Omnigent policy approval_gate; counts toward the embodied-run cap).
+    :param excite_groups: Group / cell-type names to activate, e.g. ["LPLC2"] or ["GF"].
+    :param silence_groups: Group names to silence, e.g. ["GF"]. Optional.
+    :param rate_hz: Poisson excitation rate (Hz).
+    :param duration_ms: Brain simulation time per trial (ms).
+    :param n_trials: Brain trials.
+    :param duration_s: Flight simulation time (s).
+    :param seed: Random seed of brain input and body.
+    :param agent: Calling agent role name.
+    :param run_id: Run id; default = active run.
+    :returns: descending rates, flight command, flight metrics (airborne, takeoff time, height, heading), video,
+        artifact (flight_NN.json - pass it to verify_movement), mock flags (brain / bridge / flight body).
+    """
+    rid = _rid(run_id)
+    ex, si = _as_list(excite_groups), _as_list(silence_groups)
+    try:
+        bres, meta = _simulate_brain(ex, si, rate_hz, duration_ms, n_trials, seed)
+        rates = {str(k): float(v) for k, v in (bres.get("rates") or {}).items()}
+        dn = _group_rates(rates, "descending")
+        cmd, binfo = _flight_command_from_rates(rates)
+        clean = {k: float(cmd.get(k, 0.0) or 0.0) for k in ("takeoff", "thrust", "yaw", "pitch")}
+        video_path = _next_artifact(rid, "flight", "mp4")
+        fres = _simulate_flight(clean, duration_s, str(video_path), seed)
+        summ = _flight_summary(fres)
+        mock_parts = [c for c, m in (("brain", _mock("brain")), ("bridge", bool(binfo.get("mock"))),
+                                     ("flight_body", bool(fres.get("mock")))) if m]
+        path = _save_json(video_path.with_suffix(".json"),
+                          {"inputs": {"excite": ex, "silence": si, "rate_hz": rate_hz, "duration_ms": duration_ms,
+                                      "n_trials": n_trials, "duration_s": duration_s, "seed": seed}, **meta,
+                           "descending_group_rates_hz": dn, "command": cmd, "bridge": binfo, "flight": fres,
+                           "brain_runtime_s": bres.get("runtime_s"), "mock": bool(mock_parts), "mock_parts": mock_parts})
+        out = {"ok": True, "run_id": rid, "kind": "embodied_flight", "excite": ex, "silence": si, **meta,
+               "descending_group_rates_hz": dict(sorted(dn.items(), key=lambda kv: kv[1], reverse=True)[:12]),
+               "command": clean, "bridge": binfo, **summ, "brain_runtime_s": bres.get("runtime_s"),
+               "body_runtime_s": fres.get("runtime_s"), "artifact": path, "mock": bool(mock_parts),
+               "mock_parts": mock_parts}
+        if mock_parts:
+            out["notice"] = MOCK_NOTICE + f" Mocked: {mock_parts}."
+        record.log_event(rid, agent, "experiment_result",
+                         f"Embodied flight: excite={ex} silence={si} -> command={clean} -> {summ.get('behavior')}"
+                         + (f" [MOCK: {', '.join(mock_parts)}]" if mock_parts else ""),
+                         {k: out.get(k) for k in ("kind", "excite", "silence", "descending_group_rates_hz", "command",
+                                                  "bridge", "behavior", "airborne", "takeoff_time_s", "max_height_mm",
+                                                  "heading_change_deg", "video", "artifact", "mock", "mock_parts",
+                                                  "unknown_groups")})
+        return out
+    except Exception as exc:
+        return _err("run_embodied_flight", exc, rid, agent)
+
+
 # =========================================================================== analysis tools
 
 # Mirrors flylab.bridge.rates_to_drive (backward = MDN, forward = P9): comparing these groups' manipulation with
 # the behavior they are wired to is a check of the hand-designed bridge + body, not an independent test.
 _BRIDGE_SOURCE = {"backward": ("MDN",), "forward": ("P9",)}
-_ARTIFACT_RE = re.compile(r"\b((?:embodied|brain|screen|body)_\d+)", re.IGNORECASE)
+_ARTIFACT_RE = re.compile(r"\b((?:embodied|brain|screen|flightbody|flight|body)_\d+)", re.IGNORECASE)
 
 
 def _same_group(a: str, b: str) -> bool:
@@ -849,6 +1034,19 @@ def _check_experiment_ref(rid: str, experiment_ref: str, entry: dict, obs: str) 
             manip[n] = {"excite": ex, "silence": si}
             if n.startswith("embodied") and isinstance(a.get("body"), dict) and a["body"].get("behavior"):
                 body_labels.append(str(a["body"]["behavior"]))
+            if n.startswith("flight") and isinstance(a.get("flight"), dict) and a["flight"].get("behavior"):
+                body_labels.append(str(a["flight"]["behavior"]))
+            vfs = sorted(record.artifacts_dir(rid).glob(f"{n}_verify_*.json"))
+            if vfs:  # movement-verifier verdicts for this run (flylab.verify via the verify_movement tool)
+                lst = []
+                for vf in vfs:
+                    v = json.loads(vf.read_text(encoding="utf-8"))
+                    lst.append({"expected": v.get("expected_behavior"), "final_verdict": v.get("final_verdict"),
+                                "kinematic": (v.get("kinematic") or {}).get("verdict"),
+                                "vision": (v.get("vision") or {}).get("verdict"), "agreement": v.get("agreement")})
+                out.setdefault("movement_verification", {})[n] = lst
+            elif n.startswith(("embodied", "flight")):
+                out.setdefault("movement_verification", {})[n] = None
         out["manipulated"] = manip
         key = "silence" if str(entry.get("manipulation")) == "silence" else "excite"
         out["manipulation_match"] = any(_same_group(tgt, g) for m in manip.values() for g in m[key])
@@ -945,6 +1143,24 @@ def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experi
             note = (note + " " if note else "") + chk["note"]
         elif chk["note"]:
             note = (note + " " if note else "") + chk["note"]
+        # Movement verifier (flylab.verify): did the body really perform the movement the label claims?
+        mv = chk.get("movement_verification") or {}
+        movement_verified = None
+        for n, vl in mv.items():
+            if not vl:
+                note = (note + " " if note else "") + f"{n}: body movement NOT verified (no verify_movement call)."
+                continue
+            for v in vl:
+                if v.get("expected") != obs:
+                    continue
+                movement_verified = v.get("final_verdict") == "correct"
+                if v.get("final_verdict") == "incorrect" and verdict == "consistent":
+                    verdict, comparable = "inconclusive", False
+                    note = (note + " " if note else "") + (f"movement verifier says the body did NOT perform '{obs}' "
+                                                           f"in {n} - label not trusted.")
+                elif v.get("final_verdict") == "uncertain":
+                    note = (note + " " if note else "") + (f"movement verifier is UNCERTAIN that {n} shows '{obs}' "
+                                                           f"(kinematic={v.get('kinematic')}, vision={v.get('vision')}).")
         surprise = verdict in ("inconsistent", "partially_consistent")
         cit = entry.get("citation") or {}
         doi = cit.get("doi") if isinstance(cit, dict) else None
@@ -956,7 +1172,8 @@ def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experi
                "evidence": entry.get("evidence"), "citation": cit, "experiment_ref": experiment_ref,
                "manipulation_match": chk["manipulation_match"], "manipulated": chk["manipulated"],
                "label_source": chk["label_source"], "body_label": chk["body_label"],
-               "by_construction": chk["by_construction"], "mock": bool(entry.get("mock"))}
+               "by_construction": chk["by_construction"], "mock": bool(entry.get("mock")),
+               "movement_verification": mv or None, "movement_verified": movement_verified}
         tags = []
         if chk["label_source"] == "agent_override":
             tags.append(f"agent label; body classifier said {chk['body_label']}")
@@ -966,6 +1183,10 @@ def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experi
             tags.append("bridge maps this group to this behavior by construction")
         if chk["manipulation_match"] is False:
             tags.append("NOT a test of this entry: manipulation mismatch")
+        if movement_verified is False:
+            tags.append("movement NOT confirmed by the verifier")
+        elif movement_verified:
+            tags.append("movement confirmed by verifier (kinematic + vision)")
         record.log_event(rid, agent, "analysis",
                          f"{ground_truth_id} ({effect} {exp}): observed {obs}"
                          + (f", control {ctrl}" if ctrl else "") + f" -> {verdict}"
@@ -974,11 +1195,200 @@ def compare_to_ground_truth(observed_behavior: str, ground_truth_id: str, experi
                          {k: out[k] for k in ("ground_truth_id", "manipulation", "target_group", "effect", "expected",
                                               "observed", "control", "verdict", "note", "surprise", "comparable",
                                               "readout_group", "gt_confidence", "experiment_ref", "manipulation_match",
-                                              "manipulated", "label_source", "body_label", "by_construction", "mock")},
+                                              "manipulated", "label_source", "body_label", "by_construction", "mock",
+                                              "movement_verification", "movement_verified")},
                          [doi] if doi else [])
         return out
     except Exception as exc:
         return _err("compare_to_ground_truth", exc, rid, agent)
+
+
+# =========================================================================== movement verification (Phase 3)
+
+
+def _expected_from(ground_truth_id: str, hypothesis_id: str, rid: str) -> tuple[str, str]:
+    if ground_truth_id:
+        e = {str(x.get("id")): x for x in _ground_truth()}.get(str(ground_truth_id))
+        if e is None:
+            raise ValueError(f"unknown ground_truth_id {ground_truth_id!r}")
+        return str(e.get("expected_behavior") or ""), f"ground truth {ground_truth_id}"
+    if hypothesis_id:
+        for ev in record.load(rid):
+            d = ev.get("data") or {}
+            if ev.get("type") == "hypothesis" and isinstance(d, dict) and str(d.get("hypothesis_id")) == str(hypothesis_id):
+                return str(d.get("predicted_behavior") or ""), f"hypothesis {hypothesis_id} (agent-generated)"
+        raise ValueError(f"hypothesis {hypothesis_id!r} not found in the record")
+    return "", ""
+
+
+def verify_movement(experiment_ref: str, expected_behavior: str = "", ground_truth_id: str = "",
+                    hypothesis_id: str = "", use_vision: bool = True, agent: str = "movement_verifier",
+                    run_id: str = "") -> dict:
+    """Movement verifier: did the BODY really perform the expected movement after the neuron activation?
+    Two independent checks (flylab.verify): (1) kinematics recomputed from the raw trajectory with its own
+    formulas/thresholds (not the body classifier), (2) a BLIND Claude-vision check of a keyframe contact sheet
+    of the run's video (the vision model is told neither the expected behaviour nor the numbers).
+    final_verdict = correct only if both agree; disagreement / weak effect / fall -> uncertain.
+    :param experiment_ref: Artifact of the run, e.g. "embodied_01" or "flight_01" (from the runner's result).
+    :param expected_behavior: Expected movement (walk: forward, backward, turn_left, turn_right, stop; flight:
+        escape (= takeoff), no_takeoff, hover, climb, forward_flight, flight_turn_left, flight_turn_right). Optional
+        if ground_truth_id or hypothesis_id is given.
+    :param ground_truth_id: Take the expected behaviour from this published result (list_ground_truth).
+    :param hypothesis_id: Take the expected behaviour from this agent-generated hypothesis (e.g. "H1").
+    :param use_vision: Run the blind vision check (one Claude call, cached by video hash, ~$0.02).
+    :param agent: Calling agent role name.
+    :param run_id: Run id; default = active run.
+    :returns: {final_verdict, agreement, kinematic: {verdict, checks, recomputed}, vision: {verdict,
+        observed_behavior, confidence, observations} | None, reason, contact_sheet, artifact}.
+    """
+    rid = _rid(run_id)
+    try:
+        names = [m.lower() for m in _ARTIFACT_RE.findall(str(experiment_ref or ""))]
+        names = [n for n in names if n.startswith(("embodied", "flight"))]
+        if not names:
+            return {"ok": False, "error": f"experiment_ref {experiment_ref!r} names no embodied_NN / flight_NN / "
+                                          "flightbody_NN artifact (brain-only runs have no body movement to verify)"}
+        stem = names[0]
+        art = record.artifacts_dir(rid) / f"{stem}.json"
+        if not art.exists():
+            return {"ok": False, "error": f"artifact {stem}.json not found in runs/{rid}/artifacts"}
+        a = json.loads(art.read_text(encoding="utf-8"))
+        if expected_behavior:
+            exp, source = str(expected_behavior).strip(), "given by caller"
+        else:
+            exp, source = _expected_from(ground_truth_id, hypothesis_id, rid)
+        if not exp:
+            return {"ok": False, "error": "pass expected_behavior, ground_truth_id or hypothesis_id"}
+        from flylab import verify
+        mode = "flight" if isinstance(a.get("flight"), dict) else "walk"
+        holder = a.get("flight") if mode == "flight" else a.get("body")
+        vid = (holder or {}).get("video")
+        sheet = str(record.artifacts_dir(rid) / f"{stem}_contact.jpg")
+        v = verify.verify_movement(a, exp, mode=mode, use_vision=bool(use_vision), video_path=vid, sheet_path=sheet)
+        v["contact_sheet"] = _rel(v.get("contact_sheet")) if v.get("contact_sheet") else None
+        v["video"] = _rel(v.get("video"))
+        mock = bool(a.get("mock"))
+        v.update({"artifact": f"{stem}.json", "expected_source": source, "mock": mock,
+                  "manipulation": {"excite": (a.get("inputs") or {}).get("excite"),
+                                   "silence": (a.get("inputs") or {}).get("silence")}})
+        vpath = _save_json(record.artifacts_dir(rid) / f"{stem}_verify_{v['expected_behavior']}.json", v)
+        vis = v.get("vision") or {}
+        kin = v["kinematic"]
+        content = (f"Movement check {stem} (expected {v['expected_behavior']}, from {source}): kinematic={kin['verdict']}, "
+                   + (f"vision={vis.get('verdict')} (blind: observed {vis.get('observed_behavior')}, "
+                      f"conf {vis.get('confidence')})" if vis else f"vision=n/a ({v.get('vision_error') or 'disabled'})")
+                   + f" -> FINAL {v['final_verdict'].upper()}" + (" [MOCK run]" if mock else ""))
+        record.log_event(rid, agent, "movement_verification", content,
+                         {"artifact": f"{stem}.json", "verification": vpath, "expected_behavior": v["expected_behavior"],
+                          "expected_source": source, "mode": v["mode"], "final_verdict": v["final_verdict"],
+                          "agreement": v["agreement"], "methods": v["methods"], "reason": v["reason"],
+                          "kinematic": {"verdict": kin["verdict"], "reason": kin.get("reason"), "checks": kin.get("checks")},
+                          "vision": {k: vis.get(k) for k in ("verdict", "observed_behavior", "matches_expected",
+                                                             "confidence", "observations", "model", "frames_used",
+                                                             "cached")} if vis else None,
+                          "vision_error": v.get("vision_error"), "contact_sheet": v["contact_sheet"], "video": v["video"],
+                          "manipulation": v["manipulation"], "mock": mock})
+        hint = None
+        if v["final_verdict"] != "correct":
+            hint = ("Not confirmed: do NOT count this run as a behavioural match. Report to the supervisor; options: "
+                    "rerun with another seed / longer duration_s, inspect the bridge drive, or reopen the assumption "
+                    "that this pathway drives this movement.")
+        return {"ok": True, "run_id": rid, "artifact": f"{stem}.json", "expected_behavior": v["expected_behavior"],
+                "expected_source": source, "mode": v["mode"], "final_verdict": v["final_verdict"],
+                "agreement": v["agreement"], "reason": v["reason"], "methods": v["methods"],
+                "kinematic": {"verdict": kin["verdict"], "reason": kin.get("reason"), "checks": kin.get("checks"),
+                              "recomputed": kin.get("recomputed")},
+                "vision": v.get("vision"), "vision_error": v.get("vision_error"), "contact_sheet": v["contact_sheet"],
+                "verification_file": vpath, "mock": mock, "next_action_hint": hint}
+    except Exception as exc:
+        return _err("verify_movement", exc, rid, agent)
+
+
+# =========================================================================== parallel experiments (R6)
+
+_PARALLEL_KINDS = {"brain": "run_brain_experiment", "embodied": "run_embodied_experiment",
+                   "embodied_flight": "run_embodied_flight", "flight": "run_flight_experiment",
+                   "screen": "run_brain_screen", "body": "run_body_experiment"}
+MAX_PARALLEL_SPECS = 6
+
+
+def _spec_list(specs: Any) -> list:
+    if isinstance(specs, str):
+        specs = json.loads(specs)
+    return [dict(s or {}) for s in (specs or [])]
+
+
+def run_experiments_parallel(specs: list, max_workers: int = 3, agent: str = "runner", run_id: str = "") -> dict:
+    """Run several INDEPENDENT experiments concurrently and return all results (e.g. a manipulation and its
+    control, or seed replicates). Each experiment logs its own result + artifact as if run alone.
+    EXPENSIVE when it contains embodied runs: gated by the approval policy like the single-run tools.
+    :param specs: List (max 6) of experiment specs, each {"kind": "brain"|"embodied"|"embodied_flight"|"flight"|
+        "screen"|"body", ...the arguments of the matching tool}, e.g.
+        [{"kind": "embodied", "excite_groups": ["LC16"], "seed": 0},
+         {"kind": "brain", "excite_groups": ["LC16"], "silence_groups": ["MDN"], "seed": 0}].
+    :param max_workers: Concurrent workers (1-3; brain sims use 2 threads each while parallel).
+    :param agent: Calling agent role name.
+    :param run_id: Run id; default = active run.
+    :returns: {"results": [one result per spec, same order], "wall_s", "sum_runtime_s", "speedup"}.
+    """
+    import inspect
+    from concurrent.futures import ThreadPoolExecutor
+
+    global _BRAIN_THREADS
+    rid = _rid(run_id)
+    try:
+        specs = _spec_list(specs)
+        if not specs:
+            return {"ok": False, "error": "no specs"}
+        if len(specs) > MAX_PARALLEL_SPECS:
+            return {"ok": False, "error": f"{len(specs)} specs > {MAX_PARALLEL_SPECS} per call"}
+        calls = []
+        for i, sp in enumerate(specs):
+            kind = str(sp.pop("kind", "")).strip().lower()
+            fname = _PARALLEL_KINDS.get(kind)
+            if not fname:
+                return {"ok": False, "error": f"spec {i}: unknown kind {kind!r}; use {sorted(_PARALLEL_KINDS)}"}
+            fn = globals()[fname]
+            allowed = set(inspect.signature(fn).parameters) - {"agent", "run_id"}
+            dropped = sorted(k for k in sp if k not in allowed)
+            kwargs = {k: v for k, v in sp.items() if k in allowed}
+            kwargs["agent"], kwargs["run_id"] = agent, rid
+            calls.append((kind, fn, kwargs, dropped))
+        workers = max(1, min(int(max_workers or 1), 3, len(calls)))
+        prev = _BRAIN_THREADS
+        _BRAIN_THREADS = 2 if workers > 1 else prev
+        t0 = time.time()
+        try:
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futs = [pool.submit(fn, **kw) for _, fn, kw, _ in calls]
+                results = [f.result() for f in futs]
+        finally:
+            _BRAIN_THREADS = prev
+        wall = round(time.time() - t0, 2)
+
+        def _rt(r: dict) -> float:
+            if not isinstance(r, dict):
+                return 0.0
+            if r.get("brain_runtime_s") is not None or r.get("body_runtime_s") is not None:
+                vals = [r.get("brain_runtime_s"), r.get("body_runtime_s")]
+            else:
+                vals = [r.get("runtime_s")]
+            return float(sum(float(v) for v in vals if isinstance(v, (int, float))))
+
+        sum_rt = round(sum(_rt(r) for r in results), 2)
+        speed = round(sum_rt / wall, 2) if wall > 0 and sum_rt > 0 else None
+        out = {"ok": all(isinstance(r, dict) and r.get("ok", True) for r in results), "run_id": rid,
+               "n": len(results), "workers": workers, "wall_s": wall, "sum_runtime_s": sum_rt, "speedup": speed,
+               "dropped_args": {str(i): c[3] for i, c in enumerate(calls) if c[3]} or None, "results": results}
+        record.log_event(rid, agent, "note",
+                         f"Parallel batch: {len(results)} experiments ({', '.join(c[0] for c in calls)}) on {workers} "
+                         f"workers: wall {wall} s vs sum of runtimes {sum_rt} s" + (f" (x{speed})" if speed else ""),
+                         {"parallel_batch": True, "kinds": [c[0] for c in calls], "workers": workers, "wall_s": wall,
+                          "sum_runtime_s": sum_rt, "speedup": speed,
+                          "artifacts": [r.get("artifact") for r in results if isinstance(r, dict)]})
+        return out
+    except Exception as exc:
+        return _err("run_experiments_parallel", exc, rid, agent)
 
 
 # =========================================================================== discovery-engine tools (flylab.screen)
@@ -1166,7 +1576,8 @@ def get_benchmark(name: str = "", agent: str = "", run_id: str = "") -> dict:
 # =========================================================================== Omnigent policy
 
 
-_EXPENSIVE_DEFAULT = ("run_embodied_experiment", "request_approval")
+_EXPENSIVE_DEFAULT = ("run_embodied_experiment", "run_embodied_flight", "request_approval")
+_EMBODIED_TOOLS = ("run_embodied_experiment", "run_embodied_flight")
 _PREFIXES = ("mcp__omnigent__", "functions.", "omnigent__")
 
 
@@ -1184,7 +1595,7 @@ def _embodied_runs_in_record() -> int:
         if not rid:
             return 0
         return sum(1 for e in record.load(rid) if e.get("type") == "experiment_result"
-                   and isinstance(e.get("data"), dict) and e["data"].get("kind") == "embodied")
+                   and isinstance(e.get("data"), dict) and e["data"].get("kind") in ("embodied", "embodied_flight"))
     except Exception:
         return 0
 
@@ -1231,7 +1642,35 @@ def approval_gate(ask_tools: list = None, brain_ms_threshold: float = 10000.0, m
             except json.JSONDecodeError:
                 args = {}
         state = event.get("session_state") or {}
-        if name == "run_embodied_experiment":
+        if name == "run_experiments_parallel":
+            try:
+                specs = _spec_list(args.get("specs"))
+            except Exception:  # noqa: BLE001 - malformed specs: let the tool report the error
+                return None
+            kinds = [str(sp.get("kind", "")).lower() for sp in specs]
+            n_emb = sum(k in ("embodied", "embodied_flight") for k in kinds)
+            if len(specs) > MAX_PARALLEL_SPECS:
+                return {"result": "DENY", "reason": f"{len(specs)} parallel specs > {MAX_PARALLEL_SPECS} per call."}
+            for sp in specs:
+                if str(sp.get("kind", "")).lower() == "screen" and len(_as_list(sp.get("candidates"))) > max_screen_candidates:
+                    return {"result": "DENY", "reason": f"Screen spec exceeds {max_screen_candidates} candidates per call."}
+            if n_emb:
+                n = max(int(state.get(key, 0) or 0), _embodied_runs_in_record())
+                if n + n_emb > max_embodied_runs:
+                    return {"result": "DENY", "reason": f"Parallel batch would exceed the embodied-run cap "
+                                                        f"({n} done + {n_emb} new > {max_embodied_runs})."}
+                return {"result": "ASK", "state_updates": [{"key": key, "action": "increment", "value": n_emb}],
+                        "reason": f"Parallel batch of {len(specs)} experiments incl. {n_emb} embodied run(s): {kinds}. Approve?"}
+            try:
+                cost = sum(float(sp.get("duration_ms", 1000 if k == "brain" else 500)) * float(sp.get("n_trials", 3 if k == "brain" else 2))
+                           * (len(_as_list(sp.get("candidates"))) if k == "screen" else 1)
+                           for sp, k in zip(specs, kinds) if k in ("brain", "screen"))
+            except (TypeError, ValueError):
+                cost = 0.0
+            if cost > brain_ms_threshold:
+                return {"result": "ASK", "reason": f"Parallel brain batch ({cost:.0f} simulated ms in total). Approve?"}
+            return None
+        if name in _EMBODIED_TOOLS:
             # session_state is per Omnigent session (each runner sub-agent session has its own), so
             # also count embodied results already in the active research record (cap per research run).
             n = max(int(state.get(key, 0) or 0), _embodied_runs_in_record())
@@ -1306,7 +1745,8 @@ def loop_guard(window: int = 10, threshold: int = 3, ignore_tools: list = None):
 ALL_TOOLS = [start_run, get_record, log_note, search_literature, list_neuron_groups, lookup_neurons,
              list_ground_truth, log_hypothesis, estimate_cost, log_experiment_plan, log_decision,
              request_approval, run_brain_experiment, run_body_experiment, run_embodied_experiment,
-             compare_to_ground_truth, rank_candidates, run_brain_screen, get_benchmark]
+             compare_to_ground_truth, rank_candidates, run_brain_screen, get_benchmark,
+             verify_movement, run_flight_experiment, run_embodied_flight, run_experiments_parallel]
 
 
 def _selftest(keep: bool = False) -> int:
@@ -1378,6 +1818,37 @@ def _selftest(keep: bool = False) -> int:
             assert request_approval("x", "y", 1.0)["status"] == "pre-approved"
         finally:
             os.environ.pop("FLYLAB_PREAPPROVE", None)
+        # ---- Phase 3: movement verifier, flight tools, parallel experiments
+        mv = verify_movement("embodied_01", "backward", use_vision=False)
+        assert mv["ok"] and mv["kinematic"]["verdict"] == "correct" and mv["final_verdict"] == "correct", mv
+        mv_bad = verify_movement("embodied_01.json", "forward", use_vision=False)
+        assert mv_bad["final_verdict"] == "incorrect" and mv_bad["next_action_hint"], mv_bad
+        c_mv = compare_to_ground_truth("backward", "gt_mock_mdn_activate", "embodied_01.json")
+        assert c_mv["movement_verified"] is True, c_mv
+        fl = run_embodied_flight(["MDN"])  # mock brain: MDN active, GF not -> no takeoff
+        assert fl["ok"] and fl["mock"] and fl["artifact"].endswith("flight_01.json"), fl
+        fb = run_flight_experiment(takeoff=1.0, thrust=0.6)
+        assert fb["ok"] and fb["behavior"] != "no_takeoff", fb
+        mvf = verify_movement(fb["artifact"], "escape", use_vision=False)
+        assert mvf["mode"] == "flight" and mvf["final_verdict"] == "correct", mvf
+        par = run_experiments_parallel([{"kind": "brain", "excite_groups": ["MDN"], "seed": 0},
+                                        {"kind": "brain", "excite_groups": ["P9"], "seed": 1},
+                                        {"kind": "embodied", "excite_groups": ["MDN"], "seed": 2, "bogus": 1}])
+        assert par["ok"] and par["n"] == 3 and par["dropped_args"] == {"2": ["bogus"]}, par
+        stems = sorted(Path(r["artifact"]).stem for r in par["results"])
+        assert len(set(stems)) == 3, stems
+        arts = record.artifacts_dir(rid)
+        assert not list(arts.glob("*.reserved")), list(arts.glob("*.reserved"))
+        ppar = {"type": "tool_call", "data": {"name": "run_experiments_parallel", "arguments": {
+            "specs": [{"kind": "embodied", "excite_groups": ["MDN"]}, {"kind": "brain", "excite_groups": ["MDN"]}]}}}
+        assert pol(ppar)["result"] == "ASK", pol(ppar)
+        ppar_brain = {"type": "tool_call", "data": {"name": "run_experiments_parallel", "arguments": {
+            "specs": [{"kind": "brain", "excite_groups": ["MDN"]}, {"kind": "brain", "excite_groups": ["P9"]}]}}}
+        assert pol(ppar_brain) is None, pol(ppar_brain)
+        pcap = {"type": "tool_call", "session_state": {"_flylab_embodied_runs": 5}, "data": {
+            "name": "run_experiments_parallel", "arguments": {"specs": [{"kind": "embodied"}, {"kind": "embodied_flight"}]}}}
+        assert pol(pcap)["result"] == "DENY", pol(pcap)
+        assert pol({"type": "tool_call", "data": {"name": "run_embodied_flight", "arguments": {}}})["result"] == "ASK"
         print(json.dumps(record.summarize(rid), indent=1))
         print("failed steps:", [b.get("tool") for b in bad])
         return 1 if bad else 0

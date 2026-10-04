@@ -26,6 +26,12 @@ def _bench() -> None:
     ui_bench.page()
 
 
+def _flight() -> None:
+    from flylab import ui_flight
+
+    ui_flight.page()
+
+
 def _validation() -> None:
     from flylab import ui_validation
 
@@ -43,6 +49,7 @@ nav = st.navigation(
     [
         st.Page(_notebook, title="Lab notebook", icon=":material/menu_book:", url_path="notebook", default=True),
         st.Page(_bench, title="Experiment bench", icon=":material/science:", url_path="bench"),
+        st.Page(_flight, title="Flight & 3D", icon=":material/flight_takeoff:", url_path="flight"),
         st.Page(_validation, title="Validation & speed", icon=":material/fact_check:", url_path="validation"),
         st.Page(_method, title="Method & limits", icon=":material/account_tree:", url_path="method"),
     ]
@@ -52,8 +59,8 @@ with st.sidebar:
     st.markdown("### Embodied Fly Lab")
     st.caption(
         "An Omnigent agent lab that runs in-silico activation and silencing experiments on a whole-brain "
-        "Drosophila connectome model (FlyWire v783) coupled to a NeuroMechFly physics body, and checks "
-        "the results against published experiments."
+        "Drosophila connectome model (FlyWire v783) coupled to a physics body that walks and flies, lets a "
+        "movement-verifier agent check every movement, and compares the results with published experiments."
     )
     kr = ui.key_results()
     if kr:

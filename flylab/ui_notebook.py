@@ -167,6 +167,94 @@ def _ranking_evidence(d: dict) -> None:
                    + "; ".join(f"{ct} rank {v.get('rank', '?')}" for ct, v in known.items() if isinstance(v, dict)))
 
 
+def _flight_block(d: dict, art: dict | None = None) -> None:
+    """Flight result: adapter command (takeoff / thrust / yaw / pitch) + physics outcome."""
+    art = art if isinstance(art, dict) else {}
+    cmd = d.get("command") if isinstance(d.get("command"), dict) else {}
+    if str(d.get("kind")) == "flight_body":
+        st.caption("Body-only control: the flight command was set by hand, no brain involved (G4: a body that can "
+                   "fly is not evidence of connectome control).")
+    if cmd:
+        c = st.columns(4)
+        c[0].metric("takeoff", ui.fmt_num(cmd.get("takeoff"), 2))
+        c[1].metric("thrust", ui.fmt_num(cmd.get("thrust"), 2))
+        c[2].metric("yaw (neg = left)", ui.fmt_num(cmd.get("yaw"), 2))
+        c[3].metric("pitch", ui.fmt_num(cmd.get("pitch"), 2))
+        binfo = d.get("bridge") if isinstance(d.get("bridge"), dict) else {}
+        explain = cmd.get("explain") or binfo.get("explain")
+        if binfo.get("mock"):
+            st.warning(str(binfo.get("bridge") or "MOCK flight adapter"))
+        if explain:
+            with st.expander("Adapter: how rates became this flight command"):
+                st.json(explain, expanded=False)
+    if d.get("mock_parts"):
+        st.markdown("Mocked parts: " + " ".join(ui.badge(str(x), "orange") for x in d["mock_parts"]))
+    full = art.get("flight") if isinstance(art.get("flight"), dict) else {}
+    fl = {**full, **{k: v for k, v in d.items() if v is not None}}
+    beh = fl.get("behavior") or d.get("behavior")
+    if beh:
+        st.markdown(f"Behavior: {ui.badge(beh, 'blue')}"
+                    + (f" {ui.badge('airborne', 'green')}" if fl.get("airborne") else ""))
+    c = st.columns(3)
+    c[0].metric("max height", ui.fmt_num(fl.get("max_height_mm"), 2, " mm"))
+    c[1].metric("flight time", ui.fmt_num(fl.get("flight_time_s"), 2, " s"))
+    c[2].metric("heading change (+ = left)", ui.fmt_num(fl.get("heading_change_deg"), 1, " deg"))
+
+
+def _verification_block(v: dict, compact: bool = False) -> None:
+    """flylab.verify result: kinematic verdict (recomputed from the raw trajectory) vs. vision verdict."""
+    vs = ui.verification_summary(v)
+    if not vs:
+        return
+    final = str(vs.get("final") or "?")
+    line = [f"Movement verifier {ui.badge(final, ui.VERIFY_COLOR.get(final, 'gray'))}"]
+    if vs.get("expected"):
+        line.append(f"expected **{vs['expected']}**" + (f" ({vs['mode']})" if vs.get("mode") else ""))
+    if vs.get("agreement") is not None:
+        line.append("kinematic and vision " + (ui.badge("agree", "green") if vs["agreement"]
+                                                else ui.badge("disagree", "red")))
+    st.markdown(" · ".join(line))
+    if compact:
+        return
+    import pandas as pd
+
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        kv = str(vs.get("kinematic") or "n/a")
+        st.markdown(f"**Kinematic check** {ui.badge(kv, ui.VERIFY_COLOR.get(kv, 'gray'))}")
+        if vs.get("checks"):
+            df = pd.DataFrame(vs["checks"])
+            for c in df.columns:
+                if df[c].dtype == object:
+                    df[c] = df[c].map(lambda x: "" if x is None else str(x))
+            st.dataframe(df, hide_index=True, width="stretch")
+        st.caption("Recomputed from the raw trajectory, independent of the body's own behaviour classifier.")
+    with c2:
+        if vs.get("vision_used"):
+            vv = str(vs.get("vision") or "n/a")
+            st.markdown(f"**Vision check** {ui.badge(vv, ui.VERIFY_COLOR.get(vv, 'gray'))}"
+                        + (f" <span class='fl-small'>{vs.get('model')}, {vs.get('frames_used')} frames</span>"
+                           if vs.get("model") else ""), unsafe_allow_html=True)
+            obs = vs.get("observations")
+            if obs:
+                st.caption(obs if isinstance(obs, str) else "; ".join(map(str, obs)) if isinstance(obs, list)
+                           else str(obs))
+        else:
+            st.markdown("**Vision check** not used for this movement.")
+        cs = ui.resolve(vs.get("contact_sheet"))
+        if cs is not None and cs.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp"):
+            st.image(str(cs), caption="Keyframe contact sheet", width="stretch")
+        elif vs.get("contact_sheet"):
+            st.caption(f"Contact sheet `{vs['contact_sheet']}` not found in this deployment.")
+    if vs.get("error"):
+        st.caption(f"Verifier note: {vs['error']}")
+
+
+def _is_flight(d: dict) -> bool:
+    return (str(d.get("kind", "")).lower() in ("flight", "embodied_flight", "flight_body")
+            or str(d.get("mode", "")).lower() == "flight")
+
+
 def _result(e: dict, mock: bool) -> None:
     d = e.get("data") or {}
     kind = d.get("kind", "?")
@@ -187,6 +275,18 @@ def _result(e: dict, mock: bool) -> None:
         body_rt = (art.get("body") or {}).get("runtime_s") if isinstance(art.get("body"), dict) else None
         if b_rt is not None or body_rt is not None:
             st.caption(f"Wall time: brain {ui.fmt_num(b_rt, 1)} s, body {ui.fmt_num(body_rt, 1)} s")
+    if _is_flight(d):
+        fl = d.get("flight") if isinstance(d.get("flight"), dict) else {}
+        cols = st.columns([1, 1])
+        with cols[0]:
+            _rates_chart(d.get("descending_group_rates_hz") or d.get("key_group_rates_hz"),
+                         "Descending-neuron group rates (brain)")
+            _flight_block(d, art if isinstance(art, dict) else None)
+        with cols[1]:
+            _video(d.get("video") or fl.get("video"), mock)
+        if isinstance(d.get("verification"), dict):
+            _verification_block(d["verification"], compact=True)
+        return
     if kind == "body":
         cols = st.columns([1, 1])
         with cols[0]:
@@ -229,6 +329,24 @@ def _analysis(e: dict, gt_by_id: dict) -> None:
         f"({d.get('effect', 'induce')}) vs observed **{d.get('observed', '?')}**"
         + (f" (control: {d['control']})" if d.get("control") else "")
     )
+    tags = []
+    if d.get("by_construction"):
+        tags.append(ui.badge("by construction: the bridge maps this group to this behaviour (circular)", "orange"))
+    ls = d.get("label_source")
+    if ls == "agent_override":
+        tags.append(ui.badge("label set by the agent, not the body classifier", "red"))
+    elif ls == "brain_readout_inference":
+        tags.append(ui.badge("label inferred from brain readout", "gray"))
+    elif ls == "body_classifier":
+        tags.append(ui.badge("label from the body classifier", "blue"))
+    if d.get("manipulation_match") is False:
+        tags.append(ui.badge("not a test of this entry (manipulation mismatch)", "red"))
+    if d.get("movement_verified") is True:
+        tags.append(ui.badge("movement confirmed by the verifier", "green"))
+    elif d.get("movement_verified") is False:
+        tags.append(ui.badge("movement NOT confirmed by the verifier", "red"))
+    if tags:
+        st.markdown(" ".join(tags))
     if d.get("note"):
         st.caption(d["note"])
     if d.get("surprise"):
@@ -323,6 +441,12 @@ def render_event(e: dict, ctx: dict) -> None:
         elif t == "experiment_result":
             st.markdown(content)
             _result(e, mock)
+        elif t == "movement_verification":
+            st.markdown(content)
+            _verification_block(ui.verification_of(d))
+        elif t == "experiment_batch" or "batch" in t or d.get("parallel_batch"):
+            st.markdown(content)
+            _batch_event(d)
         elif t == "analysis":
             st.markdown(content)
             _analysis(e, ctx["gt"])
@@ -352,6 +476,116 @@ def render_event(e: dict, ctx: dict) -> None:
             if d and t not in ("note",):
                 with st.expander("data"):
                     st.json(d, expanded=False)
+
+
+# --------------------------------------------------------------------------- parallel batches
+
+
+def _num(x) -> float | None:
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return None
+
+
+def _batch_id(d: dict) -> str | None:
+    b = d.get("batch_id")
+    if not b and isinstance(d.get("batch"), dict):
+        b = d["batch"].get("id")
+    return str(b) if b else None
+
+
+def batches(events: list[dict]) -> list[dict]:
+    """Parallel experiment batches: batch events plus experiment results that carry a batch_id."""
+    out: dict[str, dict] = {}
+    for e in events:
+        d = e.get("data") if isinstance(e.get("data"), dict) else {}
+        t = str(e.get("type", ""))
+        if t == "experiment_batch" or "batch" in t or d.get("parallel_batch"):
+            bid = _batch_id(d) or f"#{e.get('seq')}"
+            b = out.setdefault(bid, {"batch": bid, "seq": e.get("seq"), "results": []})
+            exps = d.get("experiments") or d.get("specs") or d.get("results") or d.get("kinds") or []
+            b.update({"n_planned": d.get("n_experiments") or d.get("n") or (len(exps) if isinstance(exps, list) else None),
+                      "kinds": d.get("kinds"), "speedup": _num(d.get("speedup")),
+                      "workers": d.get("workers") or d.get("n_workers") or d.get("max_workers") or d.get("parallel_workers"),
+                      "wall_s": _num(d.get("wall_s") or d.get("batch_wall_s") or d.get("runtime_s")),
+                      "serial_s": _num(d.get("sum_runtime_s") or d.get("serial_s") or d.get("sum_experiment_s"))})
+        elif t == "experiment_result":
+            bid = _batch_id(d)
+            if bid:
+                out.setdefault(bid, {"batch": bid, "seq": e.get("seq"), "results": []})["results"].append(d)
+    rows = []
+    for b in out.values():
+        res = b["results"]
+        rts = [_num(r.get("runtime_s")) for r in res if _num(r.get("runtime_s")) is not None]
+        serial = b.get("serial_s") or (sum(rts) if rts else None)
+        wall = b.get("wall_s")
+        speed = b.get("speedup") or (serial / wall if serial and wall else None)
+        kinds = b.get("kinds") if isinstance(b.get("kinds"), list) else [r.get("kind", "?") for r in res]
+        rows.append({"batch": b["batch"], "event": b.get("seq"),
+                     "experiments": len(res) or b.get("n_planned"), "parallel workers": b.get("workers"),
+                     "kinds": ", ".join(sorted({str(k) for k in kinds})),
+                     "batch wall s": round(wall, 1) if wall else None,
+                     "sum of experiment wall s": round(serial, 1) if serial else None,
+                     "observed parallel speed-up": f"{speed:.1f}x" if speed else ""})
+    return rows
+
+
+def _batch_event(d: dict) -> None:
+    import pandas as pd
+
+    exps = d.get("experiments") or d.get("specs") or d.get("results") or []
+    bits = []
+    for k, lab in (("workers", "workers"), ("n_workers", "workers"), ("wall_s", "wall s"),
+                   ("sum_runtime_s", "sum of experiment s"), ("speedup", "speed-up x")):
+        if d.get(k) is not None:
+            bits.append(f"{lab} **{d[k]}**")
+    if bits:
+        st.markdown(" · ".join(bits))
+    rows = [x for x in exps if isinstance(x, dict)] if isinstance(exps, list) else []
+    if rows:
+        df = pd.DataFrame(rows)
+        for c in df.columns:
+            df[c] = df[c].map(lambda x: "" if x is None else (", ".join(map(str, x)) if isinstance(x, list)
+                                                             else str(x)))
+        st.dataframe(df, hide_index=True, width="stretch")
+    elif isinstance(d.get("artifacts"), list) and d["artifacts"]:
+        st.caption("Artifacts: " + ", ".join(f"`{a}`" for a in d["artifacts"] if a))
+    elif d:
+        with st.expander("data"):
+            st.json(d, expanded=False)
+
+
+def _batches_panel(events: list[dict]) -> None:
+    import pandas as pd
+
+    rows = batches(events)
+    if not rows:
+        return
+    st.markdown("**Parallel experiment batches** (independent experiments run at the same time; speed-up = sum of "
+                "the single experiments' wall times / wall time of the batch, as measured)")
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+
+
+def _verification_panel(events: list[dict]) -> None:
+    import pandas as pd
+
+    rows = []
+    for e in events:
+        if e.get("type") != "movement_verification":
+            continue
+        d = e.get("data") if isinstance(e.get("data"), dict) else {}
+        vs = ui.verification_summary(ui.verification_of(d))
+        rows.append({"event": e.get("seq"),
+                     "experiment": str(d.get("artifact") or d.get("condition") or d.get("experiment") or ""),
+                     "mode": vs.get("mode") or "", "expected": vs.get("expected") or "",
+                     "kinematic": vs.get("kinematic") or "", "vision": vs.get("vision") or "not used",
+                     "final": vs.get("final") or "",
+                     "agree": "" if vs.get("agreement") is None else ("yes" if vs["agreement"] else "NO")})
+    if rows:
+        st.markdown("**Movement verification** (did the body do what the brain commanded? kinematic check vs. "
+                    "vision check of keyframes)")
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
 
 # --------------------------------------------------------------------------- page
@@ -412,7 +646,7 @@ def page() -> None:
     st.markdown(loop_strip(summary["by_type"]), unsafe_allow_html=True)
 
     bt = summary["by_type"]
-    m = st.columns(6)
+    m = st.columns(7)
     m[0].metric("Events", summary["n_events"])
     m[1].metric("Agents", len(summary["by_agent"]))
     m[2].metric("Hypotheses", bt.get("hypothesis", 0))
@@ -423,11 +657,17 @@ def page() -> None:
                      f"(scripted run): {appr.count('pre-approved')}; other: "
                      f"{len(appr) - appr.count('approved') - appr.count('pre-approved')}")
     m[5].metric("Decisions", bt.get("decision", 0))
+    mv = [ui.verification_summary(ui.verification_of(e.get("data")))
+          for e in events if e.get("type") == "movement_verification"]
+    m[6].metric("Movement checks", f"{sum(v.get('final') == 'correct' for v in mv)} / {len(mv)}" if mv else "0",
+                help="movement-verifier verdicts 'correct' / all movement checks in this run")
 
     st.markdown("**Agent hand-offs** (Omnigent supervisor and specialists; edge labels = hand-off order)")
     st.graphviz_chart(handoff_dot(summary), width="stretch")
     with st.container(border=True):
         _outcome_panel(events)
+    _batches_panel(events)
+    _verification_panel(events)
 
     st.subheader("Timeline")
     agents = list(summary["by_agent"])

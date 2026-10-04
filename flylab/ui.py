@@ -21,6 +21,11 @@ DATA = ROOT / "data"
 BENCH = DATA / "benchmarks"
 ASSETS = ROOT / "assets"
 BENCH_OUT = ROOT / "spikes" / "dashboard" / "out" / "bench"  # gitignored scratch for bench videos
+WEB = ROOT / "web"  # static Three.js replay viewer (GitHub Pages source)
+FLIGHT_ASSETS = ASSETS / "flight"
+DOCS = ROOT / "docs"
+REPO_URL = "https://github.com/maximiliankahl/embodied-fly-lab"
+PAGES_URL = "https://maximiliankahl.github.io/embodied-fly-lab/"
 
 VERDICT_COLOR = {
     "consistent": "green",
@@ -29,6 +34,7 @@ VERDICT_COLOR = {
     "inconclusive": "gray",
     "not_comparable": "gray",
 }
+VERIFY_COLOR = {"correct": "green", "incorrect": "red", "uncertain": "gray"}
 AGENT_COLOR = {
     "human": "gray",
     "supervisor": "violet",
@@ -39,6 +45,8 @@ AGENT_COLOR = {
     "runner": "green",
     "analysis": "violet",
     "record_keeper": "gray",
+    "movement_verifier": "green",
+    "verifier": "green",
 }
 TYPE_LABEL = {
     "question": "Question",
@@ -48,6 +56,8 @@ TYPE_LABEL = {
     "experiment_choice": "Experiment choice",
     "approval": "Human approval gate",
     "experiment_result": "Result",
+    "movement_verification": "Movement verification",
+    "experiment_batch": "Parallel experiment batch",
     "analysis": "Analysis",
     "decision": "Decision",
     "note": "Note",
@@ -59,6 +69,7 @@ LOOP_STAGES = [
     ("experiment_options", "Experiment designs"),
     ("approval", "Human approval"),
     ("experiment_result", "Result"),
+    ("movement_verification", "Movement check"),
     ("analysis", "Analysis"),
     ("decision", "Updated decision"),
 ]
@@ -312,6 +323,152 @@ def validation_counts(summ: dict | None) -> dict | None:
                                else max(0, (summ.get("n_comparable") or 0) - (summ.get("n_informative") or 0))}
 
 
+# --------------------------------------------------------------------------- flight + movement verification
+
+
+def dig(d: Any, *paths: str, default: Any = None) -> Any:
+    """First non-None value among dotted paths, e.g. dig(row, "verification.final_verdict", "verdict")."""
+    for path in paths:
+        cur = d
+        for k in path.split("."):
+            cur = cur.get(k) if isinstance(cur, dict) else None
+            if cur is None:
+                break
+        if cur is not None:
+            return cur
+    return default
+
+
+def as_list(x: Any) -> list:
+    if x is None or x == "":
+        return []
+    if isinstance(x, (list, tuple)):
+        return [y for y in x if y is not None and y != ""]
+    return [x]
+
+
+def stimulus_type(stim_groups: list, explicit: Any = None) -> str:
+    """'direct DN' (an adapter input group is stimulated: partly circular, the adapter was designed from the
+    same papers) vs 'upstream' (stimulus enters the brain upstream of the descending neurons, so the
+    behaviour is emergent from the connectome model). An explicit label in the data wins."""
+    if isinstance(explicit, str) and explicit:
+        return explicit
+    if explicit is True:
+        return "direct DN (partly circular)"
+    if not stim_groups:
+        return "no stimulus (control)"
+    gs = groups()
+    roles = {str(gs.get(str(g), {}).get("role", "")) for g in stim_groups}
+    if roles and roles <= {"descending"}:
+        return "direct DN (partly circular)"
+    if "descending" in roles:
+        return "mixed (DN + upstream)"
+    return "upstream (emergent via connectome)"
+
+
+def verification_summary(v: Any) -> dict:
+    """Normalise a flylab.verify.verify_movement() result (or a looser dict) for display."""
+    if not isinstance(v, dict):
+        return {}
+    kin = v.get("kinematic") if isinstance(v.get("kinematic"), dict) else {}
+    vis = v.get("vision") if isinstance(v.get("vision"), dict) else None
+    final = v.get("final_verdict") or v.get("verdict") or kin.get("verdict")
+    agree = v.get("agreement")
+    if agree is None and vis and kin.get("verdict") and vis.get("verdict"):
+        agree = kin.get("verdict") == vis.get("verdict")
+    return {"final": final, "kinematic": kin.get("verdict"), "vision": (vis or {}).get("verdict"),
+            "vision_used": vis is not None, "agreement": agree, "contact_sheet": v.get("contact_sheet"),
+            "checks": [c for c in (kin.get("checks") or []) if isinstance(c, dict)],
+            "observations": (vis or {}).get("observations"), "model": (vis or {}).get("model"),
+            "frames_used": (vis or {}).get("frames_used"), "expected": v.get("expected_behavior") or v.get("expected"),
+            "mode": v.get("mode"), "reason": v.get("reason") or kin.get("reason"),
+            "vision_observed": (vis or {}).get("observed_behavior"), "vision_confidence": (vis or {}).get("confidence"),
+            "expected_source": v.get("expected_source"),
+            "error": v.get("error") or v.get("vision_error") or (vis or {}).get("error")}
+
+
+def verification_of(d: Any) -> dict:
+    """The verify_movement() result inside an event's data: data["verification"] when it is a dict (it can
+    also be the path of the saved verification file), else the data itself."""
+    if not isinstance(d, dict):
+        return {}
+    return d["verification"] if isinstance(d.get("verification"), dict) else d
+
+
+def flight_rows(doc: Any) -> list[dict]:
+    """Normalised rows of data/benchmarks/flight_validation.json (schema read defensively).
+
+    Each: {condition, stim, silenced, rates, command, behavior, expected, verify (verification_summary),
+           checks: [{gt_id, verdict, informative, comparison, observed}], stim_type, video, wall_s, mock, raw}."""
+    items: list[dict] = []
+    if isinstance(doc, list):
+        items = [x for x in doc if isinstance(x, dict)]
+    elif isinstance(doc, dict):
+        for k in ("rows", "results", "conditions", "entries", "runs", "experiments"):
+            if isinstance(doc.get(k), list):
+                items = [x for x in doc[k] if isinstance(x, dict)]
+                break
+    out = []
+    for it in items:
+        stim = as_list(dig(it, "stimulus_groups", "excite_groups", "excite", "stimulus.excite", "stimulus"))
+        if len(stim) == 1 and isinstance(stim[0], dict):
+            stim = as_list(stim[0].get("excite") or stim[0].get("groups"))
+        sil = as_list(dig(it, "silenced_groups", "silence_groups", "silence", "stimulus.silence"))
+        rates = dig(it, "key_group_rates_hz", "group_rates_hz", "rates_hz", "brain.group_rates_hz",
+                    "descending_group_rates_hz", "brain_rates_hz", default={})
+        cmd = dig(it, "command", "flight_command", "bridge.command", "adapter_output", default={})
+        ver = dig(it, "verification", "verify", "verifier", "movement_verification", default=None)
+        checks = []
+        for c in as_list(it.get("checks")):
+            if isinstance(c, dict) and (c.get("gt_id") or c.get("ground_truth_id")):
+                checks.append({"gt_id": str(c.get("gt_id") or c.get("ground_truth_id")), "verdict": c.get("verdict"),
+                               "informative": c.get("informative", True), "comparison": c.get("comparison"),
+                               "observed": c.get("observed"), "reason": c.get("reason")})
+        gid = dig(it, "gt_id", "ground_truth_id", "ground_truth.id")
+        if not checks and gid:
+            checks.append({"gt_id": str(gid), "verdict": dig(it, "gt_verdict", "verdict", "ground_truth.verdict"),
+                           "informative": it.get("informative", True), "comparison": it.get("comparison"),
+                           "observed": None, "reason": it.get("reason")})
+        rts = it.get("runtimes_s") if isinstance(it.get("runtimes_s"), dict) else {}
+        out.append({
+            "condition": dig(it, "condition", "name", "id", default="?"),
+            "stim": [str(x) for x in stim if not isinstance(x, dict)], "silenced": [str(x) for x in sil],
+            "rates": rates if isinstance(rates, dict) else {},
+            "command": cmd if isinstance(cmd, dict) else {},
+            "behavior": dig(it, "behavior", "flight.behavior", "body.behavior", "result.behavior", "observed"),
+            "expected": dig(it, "expected_behavior", "expected", "verification.expected_behavior"),
+            "verify": verification_summary(ver),
+            "checks": checks,
+            "stim_type": stimulus_type([str(x) for x in stim if not isinstance(x, dict)],
+                                       dig(it, "stimulus_type", "test_type", "circular")),
+            "video": dig(it, "video", "flight.video", "body.video", "video_path"),
+            "wall_s": dig(it, "runtimes_s.total", "runtime_s", "wall_s", default=rts.get("total")),
+            "runtimes": rts,
+            "mock": bool(it.get("mock")),
+            "raw": it,
+        })
+    return out
+
+
+def flight_summary(rows: list[dict]) -> dict:
+    """Counts for the flight checks, kept separate from the walking validation."""
+    ver = [r["verify"] for r in rows if r["verify"].get("final")]
+    both = [v for v in ver if v.get("kinematic") and v.get("vision")]
+    checks = [(c, r["stim_type"]) for r in rows for c in r["checks"] if c.get("verdict")]
+    inf = [(c, t) for c, t in checks if c.get("informative") is not False
+           and str(c.get("verdict")) not in ("not_comparable", "inconclusive", "None")]
+    by_type: dict[str, dict] = {}
+    for c, t in inf:
+        b = by_type.setdefault(t, {"n": 0, "consistent": 0})
+        b["n"] += 1
+        b["consistent"] += int(c.get("verdict") == "consistent")
+    return {"n_conditions": len(rows), "n_verified": len(ver),
+            "n_verified_correct": sum(v.get("final") == "correct" for v in ver),
+            "n_both_verifiers": len(both), "n_agree": sum(bool(v.get("agreement")) for v in both),
+            "n_gt": len(inf), "n_gt_consistent": sum(c.get("verdict") == "consistent" for c, _ in inf),
+            "by_stim_type": by_type}
+
+
 def key_results() -> list[tuple[str, str]]:
     """Headline numbers for the sidebar, read from the benchmark files (missing files are skipped).
     Labels state what each number measures; the less flattering companion numbers are shown too."""
@@ -339,6 +496,16 @@ def key_results() -> list[tuple[str, str]]:
         if isinstance(lit, dict) and lit.get("reduction_factor_first_hit") is not None:
             out.append((f"{tg}: fewer experiments until the first literature-known candidate is tested "
                         f"(only {lit.get('n_hits', '?')} known candidates)", _fx(lit["reduction_factor_first_hit"])))
+    fs = flight_summary(flight_rows(load_json(BENCH / "flight_validation.json")))
+    if fs["n_gt"]:
+        out.append(("flight checks consistent with published experiments (separate from the walking checks; "
+                    + ", ".join(f"{v['consistent']}/{v['n']} {k}" for k, v in fs["by_stim_type"].items()) + ")",
+                    f"{fs['n_gt_consistent']} / {fs['n_gt']}"))
+    if fs["n_verified"]:
+        out.append(("flight movements judged correct by the movement verifier (kinematics recomputed from the raw "
+                    "trajectory" + (f"; vision agrees in {fs['n_agree']}/{fs['n_both_verifiers']}"
+                                    if fs["n_both_verifiers"] else "") + ")",
+                    f"{fs['n_verified_correct']} / {fs['n_verified']}"))
     b = load_json(BENCH / "brain_validation.json")
     bx = b.get("brain_crosscheck") if isinstance(b, dict) else None
     bx = bx or (b.get("brian2_crosscheck") if isinstance(b, dict) else None)

@@ -32,13 +32,21 @@ def check(at, label):
 
 
 ok = True
-pages = sys.argv[1:] or ["notebook", "bench", "validation", "method"]
+pages = sys.argv[1:] or ["notebook", "bench", "flight", "validation", "method"]
 t0 = time.time()
 at = AppTest.from_file(os.path.join(ROOT, "app.py"), default_timeout=60).run()
 ok &= check(at, "app.py (default page)")
 for p in pages:
     at = AppTest.from_function(run_page, args=(p,), default_timeout=120).run()
     ok &= check(at, f"page {p}")
+    if p == "validation":
+        md = " ".join(m.value for m in at.markdown)
+        print("   walking split by stimulus type shown:", "Agreement by stimulus type" in md)
+        ok &= "Agreement by stimulus type" in md
+    if p == "method":
+        md = " ".join(m.value for m in at.markdown)
+        print("   challenge checklist shown:", "| **R1** |" in md and "| **G5** |" in md)
+        ok &= "| **R1** |" in md and "| **G5** |" in md
     if p == "notebook" and len(at.selectbox):
         for opt in at.selectbox[0].options:
             at.selectbox[0].select(opt).run()

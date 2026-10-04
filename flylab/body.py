@@ -283,6 +283,7 @@ def simulate_walk(
     sample_dt_s: float = SAMPLE_DT_S,
     phase_noise_rad: float = 0.0,
     control_every: int = DEFAULT_CONTROL_EVERY,
+    record_poses: bool = False,
 ) -> dict:
     """Simulate NeuroMechFly walking on flat ground under a constant descending drive.
 
@@ -302,6 +303,9 @@ def simulate_walk(
             N physics steps (CPG integrated with N*dt, actuator targets held in
             between). Default DEFAULT_CONTROL_EVERY = 5 (~3.5x faster than the flygym
             tutorial setting 1; same labels, see DEFAULT_CONTROL_EVERY comment).
+        record_poses: if True, also record world-frame body poses of every fly body
+            at 60 fps (flylab.poses.PoseRecorder, units mm) into result["poses"] for the
+            Three.js replay viewer (flylab.export3d). Does not change the simulation.
 
     Returns the contract dict (see module docstring for sign conventions) plus extras:
         descending_signal, turn_index, yaw_rate_deg_s, net_speed_mm_s, sim_duration_s,
@@ -370,6 +374,14 @@ def simulate_walk(
     unwrapped = h0
     prev_h = h0
     upright_min = _upright_cos(sim, fly.name, thorax_idx)
+    pose_rec = None
+    if record_poses:
+        from flylab.poses import PoseRecorder
+
+        prefix = f"{fly.name}/"
+        pose_rec = PoseRecorder(sim.mj_model, fps=60.0, units="mm",
+                                body_filter=lambda n: n.startswith(prefix))
+        pose_rec.maybe_record(0.0, sim.mj_model, sim.mj_data, force=True)
     t_loop = time.perf_counter()
     for i in range(1, n_steps + 1):
         if (i - 1) % control_every == 0:  # controller rate = physics rate / control_every
@@ -377,6 +389,8 @@ def simulate_walk(
             action = ctrl.step(signal, obs)
             apply_locomotion_action(sim, fly.name, action)
         sim.step()
+        if pose_rec is not None:
+            pose_rec.maybe_record(i * dt, sim.mj_model, sim.mj_data, force=i == n_steps)
         if sim.renderer is not None:
             try:
                 sim.render_as_needed()
@@ -460,6 +474,8 @@ def simulate_walk(
     }
     if render_error:
         result["render_error"] = render_error
+    if pose_rec is not None:
+        result["poses"] = pose_rec.to_dict()
     if result["fell_over"]:
         warnings.append(
             f"fly tilted > 60 deg (min upright cos {upright_min:.2f}); behaviour label unreliable"

@@ -41,6 +41,7 @@ EVENT_TYPES = (
     "analysis",
     "decision",
     "note",
+    "movement_verification",  # flylab.verify via tools.verify_movement (Phase 3)
 )
 
 _LOCK = threading.Lock()
