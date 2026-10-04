@@ -22,11 +22,13 @@ def main():
     ap.add_argument("--preview", default="")
     ap.add_argument("--start", type=float, default=0)
     ap.add_argument("--end", type=float, default=None)
+    ap.add_argument("--channel", default="msedge",
+                    help="msedge (Windows), chrome, or 'chromium' for the bundled browser (python -m playwright install chromium)")
     a = ap.parse_args()
     frames_dir = OUT / ("preview" if a.preview else "frames")
     frames_dir.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as p:
-        b = p.chromium.launch(channel="msedge", headless=True,
+        b = p.chromium.launch(channel=None if a.channel == "chromium" else a.channel, headless=True,
                               args=["--use-angle=d3d11", "--ignore-gpu-blocklist", "--enable-gpu-rasterization", "--enable-webgl"])
         page = b.new_page(viewport={"width": a.w, "height": a.h}, device_scale_factor=1)
         page.on("console", lambda m: print("console:", m.text) if m.type in ("error", "warning") else None)
