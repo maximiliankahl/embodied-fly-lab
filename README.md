@@ -1,6 +1,6 @@
 # Embodied Fly Lab
 
-> An agentic AI lab that wires a 139,000-neuron fruit-fly brain model (FlyWire connectome) to a physics-simulated fly body (walking and flying) and lets specialist agents generate, test and check hypotheses against published experiments. A brain screen experiment takes about a second of compute.
+> **Our agents solve complex scientific problems by testing, validating through simulation and comparing with published research.** Embodied Fly Lab wires a 139,000-neuron fruit-fly brain model (FlyWire connectome) to a physics-simulated fly body (walking and flying); an Omnigent team of specialist agents generates hypotheses, runs in-silico experiments, checks the body's movement and compares every result with published experiments.
 
 Built in 24 hours at the **7th Hack-Nation Global AI Hackathon** (Munich Hub, October 3-4, 2026).
 Challenge 03: **Agentic Scientific Discovery** (Databricks, built with **Omnigent**).
@@ -14,6 +14,8 @@ Challenge 03: **Agentic Scientific Discovery** (Databricks, built with **Omnigen
 | **Challenge compliance audit** | [docs/CHALLENGE_COMPLIANCE.md](docs/CHALLENGE_COMPLIANCE.md) (every challenge item mapped to evidence, with gaps) |
 | **Omnigent guide and run log** | [docs/OMNIGENT.md](docs/OMNIGENT.md) |
 | **Data inputs (sources, versions, licences, SHA256)** | [data/manifest.json](data/manifest.json) |
+| **Knowledge base (sources, claims, runs; FlyBrainLab schema)** | [data/knowledge/](data/knowledge/) (`uv run python -m flylab.knowledge`) |
+| **Demo story mode (for the video)** | `web/index.html?story`: recorded runs only, incl. a deliberately mis-wired adapter that the movement verifier rejects |
 
 ---
 
@@ -51,7 +53,9 @@ The lab compresses that step: a connectome-guided prior, a fast whole-brain scre
 | **Atlas + literature** (`flylab/atlas.py`, `literature.py`) | 63 neuron groups mapped to FlyWire v783 IDs; 26 published neuron -> behaviour relations with 15 distinct DOIs | `spikes/audit/check_citations.py`: all 42 distinct DOIs found anywhere in the repo resolve (Europe PMC / OpenAlex, at audit time); 26 of 26 ground-truth evidence quotes occur verbatim in the abstracts. |
 | **Discovery engine** (`flylab/screen.py`) | Connectome path-strength ranking of candidate cell types + fast whole-brain screen | See results. |
 | **Agent lab** (`agents/fly_lab.yaml`) | Omnigent supervisor + 8 specialist sub-agents (literature, hypothesis, planner, safety, runner, movement verifier, analysis, record keeper) with typed tools and policies-as-code | Latest live run: 2 cycles, 12 agent sessions, 33 record events, $1.11, 550 s. |
-| **3D replay viewer** (`web/`) | Static Three.js page (no build step): 12 recorded runs (6 walking, 6 flight) with the fly's physics poses, a 138,639-point brain coloured by mean firing rate, the bridge output, the verifier verdict, the ground-truth DOI. Header: "Recorded simulation replay, not live". | Smoke test `spikes/viewer3d/check_site.py` (all files HTTP 200); flight runs reproduce their benchmark rows. |
+| **3D replay viewer** (`web/`) | Static Three.js page (no build step): 14 recorded runs (8 walking incl. the negative control and the sugar read-out, 6 flight) with the fly's physics poses, a 138,639-point brain coloured by mean firing rate, the bridge output, the verifier verdict, the ground-truth DOI. Header: "Recorded simulation replay, not live". | Smoke test `spikes/viewer3d/check_site.py` (all files HTTP 200); flight runs reproduce their benchmark rows. |
+| **Knowledge base** (`flylab/knowledge.py`, `data/knowledge/`) | Sources, claims and runs as JSONL in the FlyBrainLab schema: 26 literature claims (`reported_finding`, DOI resolved, quote checked verbatim in the abstract), agent hypotheses (`hypothesis`, unreviewed, agent-generated), bridge terms (`model_assumption`) and run records | Regenerated from the verified ground truth, the frozen bridge and `runs/*/record.jsonl` |
+| **Negative control for the verifier** (`spikes/story/make_story_runs.py`) | Adapter v0 with the steering sign flipped on purpose: DNa02-left activation makes the body turn right (-328 deg); the movement verifier returns `incorrect` (published: ipsilateral turning, Rayshubskiy et al. 2025). With the frozen bridge restored the same neurons give a left turn (`correct`). | `web/data/runs/story_miswired_dna02l.json`, `dna02l_turn_left.json` |
 | **Dashboard** (`app.py`) | Streamlit: lab notebook with agent hand-offs, experiment bench, validation and speed, flight page, method and limits | |
 
 Every agent decision is written to a shared research record (`runs/<run_id>/record.jsonl`), so each step can be reconstructed afterwards.
@@ -197,5 +201,5 @@ powershell -ExecutionPolicy Bypass -File .\agents\omni.ps1 -ApproveAtLaunch lab 
 - [Omnigent](https://github.com/omnigent-ai/omnigent) (Databricks, Apache 2.0)
 
 ## Team and credits
-Maximilian Kahl: product, story, demo. Code written with Claude (Anthropic) as an AI pair programmer.
-Teammate repository [JonasMayerDev/FlyBrainLab](https://github.com/JonasMayerDev/FlyBrainLab): we took over its replay-viewer plan (a Three.js page on GitHub Pages showing recorded runs only), its artefact-control rules for the embodiment (no scripted animations, separate logs for brain, adapter, body and rendering, a frozen and disclosed adapter, "a body that flies is not evidence of connectome control", whole-brain visualisation is not whole-brain dynamics; our checklist G1-G5 in [docs/CHALLENGE_REQUIREMENTS.md](docs/CHALLENGE_REQUIREMENTS.md)) and the idea of a data manifest with checksums ([data/manifest.json](data/manifest.json)). Its Shiu-file checksums equal ours.
+This submission merges the two versions our team built in parallel: **embodied-fly-lab** (Maximilian Kahl; brain model, bridge, walking and flying body, discovery screen, Omnigent lab, movement verifier, viewer, dashboard; code written with Claude as an AI pair programmer) and **FlyBrainLab** (Jonas Mayer, [JonasMayerDev/FlyBrainLab](https://github.com/JonasMayerDev/FlyBrainLab); Omnigent setup, knowledge-base design, replay-viewer plan, artefact-control rules, data manifest, submission plan).
+Teammate repository [JonasMayerDev/FlyBrainLab](https://github.com/JonasMayerDev/FlyBrainLab): we took over its replay-viewer plan (a Three.js page on GitHub Pages showing recorded runs only), its knowledge-base schema (sources / claims / runs, exported to [data/knowledge/](data/knowledge/)), its artefact-control rules for the embodiment (no scripted animations, separate logs for brain, adapter, body and rendering, a frozen and disclosed adapter, "a body that flies is not evidence of connectome control", whole-brain visualisation is not whole-brain dynamics; our checklist G1-G5 in [docs/CHALLENGE_REQUIREMENTS.md](docs/CHALLENGE_REQUIREMENTS.md)) and the idea of a data manifest with checksums ([data/manifest.json](data/manifest.json)). Its Shiu-file checksums equal ours.
