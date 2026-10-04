@@ -327,7 +327,11 @@ async function main() {
     const wanted = location.hash.slice(1);
     await selectRun(index.runs.some((r) => r.id === wanted) ? wanted : index.runs[0].id);
     if (manifest) $('#prov').textContent = `data manifest: ${manifest.files.length} files, ${(manifest.total_bytes / 1e6).toFixed(1)} MB, git ${manifest.git_rev || '?'}`;
-    window.__flylab = { state, fly, brain, ready: true };
+    window.__flylab = { state, fly, brain, selectRun, ready: true };
+    if (new URLSearchParams(location.search).has('story')) {
+      const { runStory } = await import('./story.js');
+      runStory({ selectRun, state, fly, brain });
+    }
   } catch (err) {
     console.error(err);
     $('#pipeline').innerHTML = `<div class="panel error">Could not load the replay data: ${esc(err.message)}</div>`;

@@ -177,3 +177,25 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: now
 @media (max-width: 900px) {
   .view .legend { position: static; padding: 8px 10px 10px; }
 }
+
+/* ---- Story mode for the demo video (index.html?story) ---- */
+body.story .runs, body.story .side, body.story .section-h, body.story #pipeline, body.story .notes,
+body.story .foot, body.story .timeline, body.story .hint, body.story .top .sub, body.story .replay-badge { display: none !important; }
+body.story .stage { grid-template-columns: minmax(0, 1fr); }
+body.story .canvas-wrap { height: 72vh; }
+body.story.story-brain .views { grid-template-columns: 1fr; }
+body.story.story-brain .views .view:first-child { display: none; }
+body.story #story-caption {
+  position: fixed; left: 50%; bottom: 4vh; transform: translate(-50%, 12px); width: min(1100px, calc(100vw - 32px));
+  background: rgba(12, 16, 22, 0.82); color: #f5f7fa; border-radius: 14px; padding: 18px 26px 20px;
+  border-left: 8px solid #7aa7ff; opacity: 0; transition: opacity .5s ease, transform .5s ease; z-index: 50;
+  box-shadow: 0 10px 40px rgba(0,0,0,.35);
+}
+body.story #story-caption.show { opacity: 1; transform: translate(-50%, 0); }
+body.story #story-caption h2 { margin: 6px 0 6px; font-size: clamp(22px, 3vw, 38px); line-height: 1.15; }
+body.story #story-caption p { margin: 0; font-size: clamp(15px, 1.6vw, 22px); line-height: 1.4; color: #d9e0ea; }
+body.story #story-caption.verdict-bad { border-left-color: #ff5a4f; }
+body.story #story-caption.verdict-bad h2 { color: #ff8a80; }
+body.story #story-caption.verdict-good { border-left-color: #35c27a; }
+body.story #story-caption.verdict-good h2 { color: #7ee2a8; }
+body.story .story-badge { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #9fb0c4; }

@@ -1,0 +1,4 @@
+miswired: turn_right | verifier: incorrect
+sugar: {'group': 'MN9', 'rates_hz': {'MN9_L': 59.667, 'MN9_R': 80.0}, 'rate_hz': 80.0, 'active': True} | behavior: stop
+C:/Users/mkahl/Hackathon/HackNation-7/02_App/web/data/runs/index.json
+EXIT 0
