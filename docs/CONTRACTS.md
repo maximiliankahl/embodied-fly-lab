@@ -65,3 +65,41 @@ Paths are relative to the `02_App` root; use `flylab.paths` helpers if present, 
 ## Dashboard (app.py, Streamlit)
 - Reads `runs/<run_id>/record.jsonl` (+ artifacts), `data/benchmarks/*.json`, `data/neurons.json`, `data/ground_truth.json`, `assets/**`.
 - Must render without any simulation dependency installed at runtime path (lazy imports), so it can be deployed in "replay" mode.
+
+---
+# Phase 3 contracts (added Sun 02:30): flight, 3D, movement verification
+
+Ground rules adopted from the team plan (JonasMayerDev/FlyBrainLab, HACKATHON_PLAN.md "Artefaktkontrollen"):
+no "if neuron X fires, play a flight animation"; brain response, adapter (bridge) output, body physics and rendering are
+logged separately; the adapter is frozen and documented before comparison runs; a body controller that can fly is not
+evidence of connectome-controlled flight - say exactly what the connectome decides (e.g. takeoff trigger, thrust, steering).
+
+## flylab/poses.py (exists)
+`PoseRecorder(mj_model, fps=60)`; `.maybe_record(t, mj_model, mj_data)` each physics step; `.to_dict()` ->
+`{"format": "flylab-poses-v1", "units", "fps", "bodies": [names], "frames": [{"t", "p": [[x,y,z]...], "q": [[w,x,y,z]...]}]}`.
+
+## flylab/flight.py  (FlyBody wings in MuJoCo, physics-based flight)
+- `simulate_flight(command: dict, duration_s: float = 1.0, render_path: str | None = None, seed: int = 0, *, record_poses: bool = False, camera: str = "chase") -> dict`
+  `command = {"takeoff": 0..1 (escape/GF: leg jump + wing start), "thrust": 0..1 (wing-stroke amplitude), "yaw": -1..1 (neg = left), "pitch": -1..1 (neg = backward, pos = forward)}`
+  returns `{"trajectory": [[t, x_mm, y_mm, z_mm, roll_deg, pitch_deg, yaw_deg], ...], "airborne": bool, "takeoff_time_s", "flight_time_s", "max_height_mm",
+            "net_displacement_mm": [dx, dy, dz], "heading_change_deg" (+ = left/CCW), "mean_speed_mm_s", "behavior", "video", "poses" (if record_poses), "runtime_s", "model_notes"}`
+  behaviour labels: "no_takeoff", "takeoff_fall", "hover", "climb", "forward_flight", "flight_turn_left", "flight_turn_right".
+- `classify_flight(metrics) -> str`.
+
+## flylab/bridge.py additions
+- `rates_to_flight_command(rates: dict) -> dict` same input handling as rates_to_drive; returns the command above + `explain`.
+  GF (DNp01) -> takeoff; flight-motor DNs (literature-verified, e.g. DNg02 population -> wing-stroke amplitude, Namiki et al. 2022) -> thrust; left/right steering asymmetry -> yaw.
+- `rates_to_behavior_command(rates) -> {"mode": "walk"|"flight", "drive" or "command", "explain"}` chooses flight when the takeoff trigger (GF) is active.
+
+## flylab/verify.py  (movement verification, used by the movement-verifier agent)
+- `verify_movement(result: dict, expected_behavior: str, mode: str = "walk"|"flight", use_vision: bool = True, video_path: str | None = None) -> dict`
+  returns `{"kinematic": {"verdict": "correct"|"incorrect"|"uncertain", "checks": [{"name","value","threshold","pass"}], "recomputed": {...}},
+            "vision": {"verdict", "observations", "model", "frames_used"} | None, "final_verdict": "correct"|"incorrect"|"uncertain",
+            "agreement": bool, "contact_sheet": path}`
+  Kinematic checks are recomputed from the raw trajectory (independent of body.classify / flight.classify_flight).
+  Vision: keyframe contact sheet -> Claude vision (anthropic SDK with header anthropic-workspace-id from .env) -> structured verdict.
+
+## flylab/export3d.py + web/  (public Three.js replay viewer on GitHub Pages)
+- `export_geometry(model="neuromechfly"|"flybody") -> path` (per-body geometry once per model), `export_run(...)` -> `web/data/runs/<id>.json`
+  (poses + brain activity summary + bridge output + verifier verdict + citations), `export_brain_points()` -> `web/data/brain_points.*` (soma/centroid positions of all neurons, compact).
+- `web/index.html` static (no build step; three.js via importmap from a CDN), deployed by `.github/workflows/pages.yml`.
