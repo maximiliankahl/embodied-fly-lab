@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Embodied Fly Lab Film</title>
+<style>
+  :root { --bg: #000; --fg: #f5f5f7; --dim: #a1a1a6; }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+  body { font-family: -apple-system, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; color: var(--fg); }
+  canvas { position: fixed; inset: 0; width: 100vw !important; height: 100vh !important; display: block; }
+  .t { position: fixed; left: 0; right: 0; text-align: center; pointer-events: none; opacity: 0; will-change: opacity, transform; }
+  #title { top: 9vh; font-weight: 600; font-size: 5.2vw; letter-spacing: -0.035em; line-height: 1.05; }
+  #sub { top: calc(9vh + 7vw); font-weight: 400; font-size: 1.9vw; color: var(--dim); letter-spacing: -0.01em; }
+  #title.red { background: linear-gradient(90deg, #ff6a5c, #ff375f); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #title.green { background: linear-gradient(90deg, #5be49b, #30d158); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #title.grad { background: linear-gradient(90deg, #f5f5f7 10%, #b9c7ff 55%, #ffd29a 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #note { bottom: 3.2vh; font-size: 0.95vw; color: #6e6e73; letter-spacing: 0.02em; }
+  #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+               "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="title" class="t"></div>
+<div id="sub" class="t"></div>
+<div id="note" class="t"></div>
+<div id="fade"></div>
+<script type="module" src="js/film.js"></script>
+</body>
+</html>
